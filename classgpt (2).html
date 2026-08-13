@@ -1,0 +1,912 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ClassGPT — a chat widget for any tab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=JetBrains+Mono:wght@400;500&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0f1015;
+    --panel:#14151a;
+    --panel-2:#191a21;
+    --border:#25262f;
+    --text:#e9e9ef;
+    --muted:#8a8b96;
+    --accent:#7c9eff;
+    --accent-dim:#4a5ba8;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;}
+  body{
+    min-height:100vh;
+    display:flex;
+    justify-content:center;
+    padding:64px 20px 100px;
+  }
+  .wrap{max-width:640px;width:100%;}
+  .eyebrow{
+    font-family:'JetBrains Mono',monospace;
+    font-size:12px;
+    letter-spacing:2px;
+    text-transform:uppercase;
+    color:var(--accent);
+    margin-bottom:14px;
+  }
+  h1{
+    font-family:'Space Grotesk',sans-serif;
+    font-size:44px;
+    line-height:1.05;
+    margin:0 0 16px;
+    letter-spacing:-0.5px;
+  }
+  h1 span{color:var(--accent);}
+  p.lede{
+    color:var(--muted);
+    font-size:16px;
+    line-height:1.6;
+    max-width:520px;
+    margin:0 0 40px;
+  }
+  .bookmark-row{
+    display:flex;
+    align-items:center;
+    gap:16px;
+    flex-wrap:wrap;
+    margin-bottom:8px;
+  }
+  .bookmarklet-btn{
+    font-family:'Space Grotesk',sans-serif;
+    font-weight:700;
+    font-size:15px;
+    color:#0f1015;
+    background:var(--accent);
+    padding:14px 22px;
+    border-radius:10px;
+    text-decoration:none;
+    cursor:grab;
+    display:inline-flex;
+    align-items:center;
+    gap:8px;
+    box-shadow:0 8px 24px rgba(124,158,255,.25);
+    user-select:none;
+  }
+  .bookmarklet-btn:active{cursor:grabbing;}
+  .drag-hint{
+    color:var(--muted);
+    font-size:13px;
+    font-family:'JetBrains Mono',monospace;
+  }
+  .steps{
+    margin:48px 0;
+    padding:0;
+    list-style:none;
+    counter-reset:step;
+    border-top:1px solid var(--border);
+  }
+  .steps li{
+    counter-increment:step;
+    padding:20px 0;
+    border-bottom:1px solid var(--border);
+    display:flex;
+    gap:18px;
+    align-items:flex-start;
+  }
+  .steps li::before{
+    content:counter(step);
+    font-family:'JetBrains Mono',monospace;
+    font-size:13px;
+    color:var(--accent);
+    border:1px solid var(--accent-dim);
+    width:26px;
+    height:26px;
+    min-width:26px;
+    border-radius:50%;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    margin-top:2px;
+  }
+  .steps h3{
+    font-family:'Space Grotesk',sans-serif;
+    font-size:16px;
+    margin:0 0 4px;
+    font-weight:700;
+  }
+  .steps p{
+    margin:0;
+    color:var(--muted);
+    font-size:14px;
+    line-height:1.55;
+  }
+  .steps a{color:var(--accent);}
+  .panel{
+    background:var(--panel);
+    border:1px solid var(--border);
+    border-radius:12px;
+    padding:24px;
+    margin-top:8px;
+  }
+  .panel h2{
+    font-family:'Space Grotesk',sans-serif;
+    font-size:18px;
+    margin:0 0 10px;
+  }
+  .panel p{color:var(--muted);font-size:14px;line-height:1.6;margin:0 0 16px;}
+  .try-btn{
+    font-family:'JetBrains Mono',monospace;
+    font-size:13px;
+    font-weight:500;
+    color:var(--text);
+    background:var(--panel-2);
+    border:1px solid var(--border);
+    padding:10px 16px;
+    border-radius:8px;
+    cursor:pointer;
+  }
+  .try-btn:hover{border-color:var(--accent-dim);}
+  .fallback{
+    margin-top:14px;
+    font-size:12.5px;
+    color:var(--muted);
+    line-height:1.6;
+  }
+  .fallback code{
+    display:block;
+    background:#0a0b0f;
+    border:1px solid var(--border);
+    border-radius:8px;
+    padding:12px;
+    margin-top:8px;
+    font-family:'JetBrains Mono',monospace;
+    font-size:11px;
+    color:#a8b6ff;
+    word-break:break-all;
+    max-height:120px;
+    overflow-y:auto;
+  }
+  .note{
+    margin-top:40px;
+    font-size:13px;
+    color:var(--muted);
+    border-left:2px solid var(--accent-dim);
+    padding-left:14px;
+    line-height:1.6;
+  }
+  .note.warn{border-left-color:#e2a33d;}
+  .scratch{margin-top:24px;}
+  .scratch textarea{
+    width:100%;
+    min-height:70px;
+    background:#0a0b0f;
+    border:1px solid var(--border);
+    border-radius:8px;
+    color:var(--text);
+    padding:10px;
+    font-family:'Inter',sans-serif;
+    font-size:13px;
+    resize:vertical;
+  }
+  .scratch label{
+    font-family:'JetBrains Mono',monospace;
+    font-size:11px;
+    color:var(--muted);
+    display:block;
+    margin-bottom:6px;
+  }
+  .key-panel{
+    background:var(--panel);
+    border:1px solid var(--accent-dim);
+    border-radius:12px;
+    padding:24px;
+    margin:32px 0;
+  }
+  .key-panel h2{font-family:'Space Grotesk',sans-serif;font-size:18px;margin:0 0 8px;}
+  .key-panel p{color:var(--muted);font-size:13.5px;line-height:1.6;margin:0 0 16px;}
+  .key-row{display:flex;gap:8px;flex-wrap:wrap;}
+  .key-row input{
+    flex:1;
+    min-width:220px;
+    padding:10px 12px;
+    border-radius:8px;
+    border:1px solid var(--border);
+    background:#0a0b0f;
+    color:var(--text);
+    font-family:'JetBrains Mono',monospace;
+    font-size:12.5px;
+  }
+  .key-row button{
+    font-family:'Space Grotesk',sans-serif;
+    font-weight:700;
+    font-size:14px;
+    color:#0f1015;
+    background:var(--accent);
+    border:none;
+    padding:10px 18px;
+    border-radius:8px;
+    cursor:pointer;
+  }
+  .key-status{
+    margin-top:12px;
+    font-size:12.5px;
+    font-family:'JetBrains Mono',monospace;
+    color:var(--muted);
+  }
+  .key-status.ready{color:#7fd99a;}
+  .feature-grid{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:10px;
+    margin-top:16px;
+  }
+  .feature-grid div{
+    background:var(--panel-2);
+    border:1px solid var(--border);
+    border-radius:8px;
+    padding:10px 12px;
+    font-size:12px;
+    color:var(--muted);
+  }
+  .feature-grid strong{color:var(--text);display:block;font-size:12.5px;margin-bottom:2px;}
+  @media (max-width:480px){.feature-grid{grid-template-columns:1fr;}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="eyebrow">bookmarklet</div>
+  <h1>Class<span>GPT</span></h1>
+  <p class="lede">A chat window that drops into any webpage. Bake your OpenRouter key in below and the bookmark just works — no prompt, no setup, every time you click it. Everything else — model, features, look — lives in its own settings panel now.</p>
+
+  <div class="key-panel">
+    <h2>1. Bake in your key</h2>
+    <p>Paste your OpenRouter key here. It's embedded straight into the bookmark link below on your device — nothing is sent anywhere. Get a free key at <a href="https://openrouter.ai/keys" target="_blank" rel="noopener" style="color:var(--accent);">openrouter.ai/keys</a>.</p>
+    <div class="key-row">
+      <input type="password" id="key-input" placeholder="sk-or-v1-...">
+      <button id="key-build">Build my bookmarklet</button>
+    </div>
+    <div class="key-status" id="key-status">no key entered yet — the link below will ask for one on first use instead</div>
+  </div>
+
+  <div class="bookmark-row">
+    <a class="bookmarklet-btn" id="main-bookmarklet" href="javascript:%28function%28%29%7B%0A%20%20var%20EXISTING%3Ddocument.getElementById%28%27classgpt-widget%27%29%3B%0A%20%20if%28EXISTING%29%7B%0A%20%20%20%20EXISTING.style.display%20%3D%20EXISTING.style.display%3D%3D%3D%27none%27%20%3F%20%27flex%27%20%3A%20%27none%27%3B%0A%20%20%20%20return%3B%0A%20%20%7D%0A%0A%20%20var%20SETTINGS_KEY%3D%27classgpt_settings%27%3B%0A%20%20var%20HISTORY_PREFIX%3D%27classgpt_history_%27%3B%0A%20%20var%20POSITION_KEY%3D%27classgpt_position%27%3B%0A%20%20var%20BAKED_KEY%3D%27__API_KEY__%27%3B%0A%0A%20%20var%20MODEL_PRESETS%3D%5B%0A%20%20%20%20%7Bid%3A%27openai/gpt-4o-mini%27%2Clabel%3A%27GPT-4o%20mini%20%28default%29%27%2Cprice%3A0.15%7D%2C%0A%20%20%20%20%7Bid%3A%27openai/gpt-4o%27%2Clabel%3A%27GPT-4o%27%2Cprice%3A2.5%7D%2C%0A%20%20%20%20%7Bid%3A%27anthropic/claude-3.5-haiku%27%2Clabel%3A%27Claude%203.5%20Haiku%27%2Cprice%3A0.8%7D%2C%0A%20%20%20%20%7Bid%3A%27anthropic/claude-3.5-sonnet%27%2Clabel%3A%27Claude%203.5%20Sonnet%27%2Cprice%3A3%7D%2C%0A%20%20%20%20%7Bid%3A%27google/gemini-2.0-flash-001%27%2Clabel%3A%27Gemini%202.0%20Flash%27%2Cprice%3A0.1%7D%2C%0A%20%20%20%20%7Bid%3A%27custom%27%2Clabel%3A%27Custom%20model%20id...%27%2Cprice%3Anull%7D%0A%20%20%5D%3B%0A%0A%20%20var%20DEFAULT_SETTINGS%3D%7B%0A%20%20%20%20model%3A%27openai/gpt-4o-mini%27%2C%0A%20%20%20%20customModel%3A%27%27%2C%0A%20%20%20%20markdown%3Atrue%2C%0A%20%20%20%20rememberHistory%3Afalse%2C%0A%20%20%20%20rememberPosition%3Afalse%2C%0A%20%20%20%20showCost%3Atrue%2C%0A%20%20%20%20allowInsert%3Atrue%2C%0A%20%20%20%20compact%3Afalse%2C%0A%20%20%20%20voiceInput%3Atrue%2C%0A%20%20%20%20keyboardShortcut%3Atrue%0A%20%20%7D%3B%0A%0A%20%20function%20loadSettings%28%29%7B%0A%20%20%20%20try%7B%0A%20%20%20%20%20%20var%20raw%3DlocalStorage.getItem%28SETTINGS_KEY%29%3B%0A%20%20%20%20%20%20if%28%21raw%29return%20Object.assign%28%7B%7D%2CDEFAULT_SETTINGS%29%3B%0A%20%20%20%20%20%20var%20parsed%3DJSON.parse%28raw%29%3B%0A%20%20%20%20%20%20return%20Object.assign%28%7B%7D%2CDEFAULT_SETTINGS%2Cparsed%29%3B%0A%20%20%20%20%7Dcatch%28e%29%7Breturn%20Object.assign%28%7B%7D%2CDEFAULT_SETTINGS%29%3B%7D%0A%20%20%7D%0A%20%20function%20saveSettings%28s%29%7B%0A%20%20%20%20localStorage.setItem%28SETTINGS_KEY%2CJSON.stringify%28s%29%29%3B%0A%20%20%7D%0A%0A%20%20var%20settings%3DloadSettings%28%29%3B%0A%20%20var%20apiKey%3D%28BAKED_KEY%26%26BAKED_KEY.indexOf%28%27API_KEY%27%29%3D%3D%3D-1%29%3FBAKED_KEY%3AlocalStorage.getItem%28%27classgpt_api_key%27%29%3B%0A%20%20if%28%21apiKey%29%7B%0A%20%20%20%20apiKey%3Dprompt%28%27Paste%20your%20OpenRouter%20API%20key%20%28get%20one%20free%20at%20openrouter.ai/keys%29%3A%27%29%3B%0A%20%20%20%20if%28%21apiKey%29return%3B%0A%20%20%20%20localStorage.setItem%28%27classgpt_api_key%27%2CapiKey%29%3B%0A%20%20%7Delse%20if%28%21localStorage.getItem%28%27classgpt_api_key%27%29%29%7B%0A%20%20%20%20localStorage.setItem%28%27classgpt_api_key%27%2CapiKey%29%3B%0A%20%20%7D%0A%0A%20%20function%20activeModel%28%29%7B%0A%20%20%20%20return%20settings.model%3D%3D%3D%27custom%27%20%3F%20%28settings.customModel%7C%7C%27openai/gpt-4o-mini%27%29%20%3A%20settings.model%3B%0A%20%20%7D%0A%0A%20%20var%20pageContext%3Dnull%3B%0A%20%20var%20compact%3Dsettings.compact%3B%0A%0A%20%20var%20box%3Ddocument.createElement%28%27div%27%29%3B%0A%20%20box.id%3D%27classgpt-widget%27%3B%0A%20%20function%20boxSize%28%29%7B%0A%20%20%20%20return%20compact%20%3F%20%7Bw%3A280%2Ch%3A380%7D%20%3A%20%7Bw%3A340%2Ch%3A520%7D%3B%0A%20%20%7D%0A%20%20function%20applySize%28%29%7B%0A%20%20%20%20var%20sz%3DboxSize%28%29%3B%0A%20%20%20%20box.style.width%3Dsz.w%2B%27px%27%3B%0A%20%20%20%20box.style.height%3Dsz.h%2B%27px%27%3B%0A%20%20%7D%0A%20%20box.style.cssText%3D%27position%3Afixed%3Bbottom%3A20px%3Bright%3A20px%3Bbackground%3A%2314151a%3Bcolor%3A%23e9e9ef%3Bborder-radius%3A14px%3Bbox-shadow%3A0%2012px%2040px%20rgba%280%2C0%2C0%2C.5%29%3Bz-index%3A2147483647%3Bdisplay%3Aflex%3Bflex-direction%3Acolumn%3Bfont-family%3A-apple-system%2CBlinkMacSystemFont%2CSegoe%20UI%2CRoboto%2Csans-serif%3Boverflow%3Ahidden%3Bborder%3A1px%20solid%20%232a2b33%3B%27%3B%0A%20%20applySize%28%29%3B%0A%0A%20%20if%28settings.rememberPosition%29%7B%0A%20%20%20%20try%7B%0A%20%20%20%20%20%20var%20pos%3DJSON.parse%28localStorage.getItem%28POSITION_KEY%29%7C%7C%27null%27%29%3B%0A%20%20%20%20%20%20if%28pos%26%26pos.left%26%26pos.top%29%7B%0A%20%20%20%20%20%20%20%20box.style.left%3Dpos.left%3Bbox.style.top%3Dpos.top%3B%0A%20%20%20%20%20%20%20%20box.style.right%3D%27auto%27%3Bbox.style.bottom%3D%27auto%27%3B%0A%20%20%20%20%20%20%7D%0A%20%20%20%20%7Dcatch%28e%29%7B%7D%0A%20%20%7D%0A%0A%20%20box.innerHTML%3D%0A%20%20%20%20%27%3Cdiv%20id%3D%22cg-header%22%20style%3D%22padding%3A10px%2012px%3Bbackground%3A%231c1d24%3Bcursor%3Amove%3Bdisplay%3Aflex%3Bjustify-content%3Aspace-between%3Balign-items%3Acenter%3Bborder-bottom%3A1px%20solid%20%232a2b33%3Bflex-shrink%3A0%3B%22%3E%27%2B%0A%20%20%20%20%20%20%27%3Cspan%20style%3D%22font-weight%3A700%3Bletter-spacing%3A.2px%3Bfont-size%3A14px%3B%22%3EClass%3Cspan%20style%3D%22color%3A%237c9eff%3B%22%3EGPT%3C/span%3E%3C/span%3E%27%2B%0A%20%20%20%20%20%20%27%3Cspan%20style%3D%22display%3Aflex%3Bgap%3A10px%3Balign-items%3Acenter%3B%22%3E%27%2B%0A%20%20%20%20%20%20%20%20%27%3Cspan%20id%3D%22cg-settings-btn%22%20title%3D%22Settings%22%20style%3D%22cursor%3Apointer%3Bopacity%3A.7%3Bfont-size%3A14px%3B%22%3E%26%239881%3B%3C/span%3E%27%2B%0A%20%20%20%20%20%20%20%20%27%3Cspan%20id%3D%22cg-close%22%20title%3D%22Close%22%20style%3D%22cursor%3Apointer%3Bopacity%3A.7%3Bfont-size%3A15px%3B%22%3E%26%2310005%3B%3C/span%3E%27%2B%0A%20%20%20%20%20%20%27%3C/span%3E%27%2B%0A%20%20%20%20%27%3C/div%3E%27%2B%0A%20%20%20%20%27%3Cdiv%20id%3D%22cg-view-chat%22%20style%3D%22display%3Aflex%3Bflex-direction%3Acolumn%3Bflex%3A1%3Bmin-height%3A0%3B%22%3E%27%2B%0A%20%20%20%20%20%20%27%3Cdiv%20id%3D%22cg-messages%22%20style%3D%22flex%3A1%3Boverflow-y%3Aauto%3Bpadding%3A12px%3Bfont-size%3A13.5px%3Bline-height%3A1.45%3B%22%3E%3C/div%3E%27%2B%0A%20%20%20%20%20%20%27%3Cdiv%20id%3D%22cg-context-bar%22%20style%3D%22display%3Anone%3Bpadding%3A6px%2012px%3Bbackground%3A%231c1d24%3Bborder-top%3A1px%20solid%20%232a2b33%3Bfont-size%3A11.5px%3Bcolor%3A%238a8b96%3Balign-items%3Acenter%3Bjustify-content%3Aspace-between%3B%22%3E%3C/div%3E%27%2B%0A%20%20%20%20%20%20%27%3Cdiv%20id%3D%22cg-cost-bar%22%20style%3D%22display%3Anone%3Bpadding%3A4px%2012px%3Bfont-size%3A10.5px%3Bcolor%3A%235f606a%3Bfont-family%3Amonospace%3B%22%3E%3C/div%3E%27%2B%0A%20%20%20%20%20%20%27%3Cdiv%20style%3D%22display%3Aflex%3Bgap%3A6px%3Bpadding%3A10px%3Bborder-top%3A1px%20solid%20%232a2b33%3Bbackground%3A%2317181f%3Bflex-shrink%3A0%3B%22%3E%27%2B%0A%20%20%20%20%20%20%20%20%27%3Cbutton%20id%3D%22cg-readpage%22%20title%3D%22Read%20this%20page%22%20style%3D%22padding%3A8px%209px%3Bborder-radius%3A8px%3Bborder%3A1px%20solid%20%232a2b33%3Bbackground%3A%230f1015%3Bcolor%3A%23e9e9ef%3Bcursor%3Apointer%3Bfont-size%3A13px%3B%22%3E%26%23128196%3B%3C/button%3E%27%2B%0A%20%20%20%20%20%20%20%20%27%3Cbutton%20id%3D%22cg-mic%22%20title%3D%22Voice%20input%22%20style%3D%22padding%3A8px%209px%3Bborder-radius%3A8px%3Bborder%3A1px%20solid%20%232a2b33%3Bbackground%3A%230f1015%3Bcolor%3A%23e9e9ef%3Bcursor%3Apointer%3Bfont-size%3A13px%3B%22%3E%26%23127908%3B%3C/button%3E%27%2B%0A%20%20%20%20%20%20%20%20%27%3Cinput%20id%3D%22cg-input%22%20style%3D%22flex%3A1%3Bpadding%3A8px%2010px%3Bborder-radius%3A8px%3Bborder%3A1px%20solid%20%232a2b33%3Bbackground%3A%230f1015%3Bcolor%3A%23e9e9ef%3Boutline%3Anone%3Bfont-size%3A13px%3Bmin-width%3A0%3B%22%20placeholder%3D%22Ask%20ClassGPT...%22%3E%27%2B%0A%20%20%20%20%20%20%20%20%27%3Cbutton%20id%3D%22cg-send%22%20style%3D%22padding%3A8px%2012px%3Bborder-radius%3A8px%3Bborder%3Anone%3Bbackground%3A%237c9eff%3Bcolor%3A%230f1015%3Bfont-weight%3A700%3Bcursor%3Apointer%3B%22%3EGo%3C/button%3E%27%2B%0A%20%20%20%20%20%20%27%3C/div%3E%27%2B%0A%20%20%20%20%27%3C/div%3E%27%2B%0A%20%20%20%20%27%3Cdiv%20id%3D%22cg-view-settings%22%20style%3D%22display%3Anone%3Bflex-direction%3Acolumn%3Bflex%3A1%3Bmin-height%3A0%3Boverflow-y%3Aauto%3Bpadding%3A14px%3Bfont-size%3A12.5px%3B%22%3E%3C/div%3E%27%3B%0A%0A%20%20document.body.appendChild%28box%29%3B%0A%0A%20%20document.getElementById%28%27cg-close%27%29.onclick%3Dfunction%28%29%7Bbox.remove%28%29%3B%7D%3B%0A%0A%20%20//%20dragging%0A%20%20var%20drag%3Dfalse%2Cox%3D0%2Coy%3D0%3B%0A%20%20var%20header%3Ddocument.getElementById%28%27cg-header%27%29%3B%0A%20%20header.onmousedown%3Dfunction%28e%29%7B%0A%20%20%20%20if%28e.target.id%3D%3D%3D%27cg-settings-btn%27%7C%7Ce.target.id%3D%3D%3D%27cg-close%27%29return%3B%0A%20%20%20%20drag%3Dtrue%3B%0A%20%20%20%20var%20r%3Dbox.getBoundingClientRect%28%29%3B%0A%20%20%20%20ox%3De.clientX-r.left%3Boy%3De.clientY-r.top%3B%0A%20%20%20%20box.style.right%3D%27auto%27%3Bbox.style.bottom%3D%27auto%27%3B%0A%20%20%20%20box.style.left%3Dr.left%2B%27px%27%3Bbox.style.top%3Dr.top%2B%27px%27%3B%0A%20%20%7D%3B%0A%20%20document.addEventListener%28%27mousemove%27%2Cfunction%28e%29%7B%0A%20%20%20%20if%28drag%29%7Bbox.style.left%3D%28e.clientX-ox%29%2B%27px%27%3Bbox.style.top%3D%28e.clientY-oy%29%2B%27px%27%3B%7D%0A%20%20%7D%29%3B%0A%20%20document.addEventListener%28%27mouseup%27%2Cfunction%28%29%7B%0A%20%20%20%20if%28drag%26%26settings.rememberPosition%29%7B%0A%20%20%20%20%20%20localStorage.setItem%28POSITION_KEY%2CJSON.stringify%28%7Bleft%3Abox.style.left%2Ctop%3Abox.style.top%7D%29%29%3B%0A%20%20%20%20%7D%0A%20%20%20%20drag%3Dfalse%3B%0A%20%20%7D%29%3B%0A%0A%20%20//%20keyboard%20shortcut%3A%20Ctrl%2BShift%2BG%20toggles%20visibility%0A%20%20function%20shortcutHandler%28e%29%7B%0A%20%20%20%20if%28%21settings.keyboardShortcut%29return%3B%0A%20%20%20%20if%28e.ctrlKey%26%26e.shiftKey%26%26%28e.key%3D%3D%3D%27G%27%7C%7Ce.key%3D%3D%3D%27g%27%29%29%7B%0A%20%20%20%20%20%20e.preventDefault%28%29%3B%0A%20%20%20%20%20%20box.style.display%20%3D%20box.style.display%3D%3D%3D%27none%27%20%3F%20%27flex%27%20%3A%20%27none%27%3B%0A%20%20%20%20%7D%0A%20%20%7D%0A%20%20document.addEventListener%28%27keydown%27%2CshortcutHandler%29%3B%0A%0A%20%20//%20---%20track%20last%20typable%20field%20outside%20widget%20---%0A%20%20var%20lastFocusedEl%3Dnull%3B%0A%20%20function%20isTypableField%28el%29%7B%0A%20%20%20%20if%28%21el%29return%20false%3B%0A%20%20%20%20if%28box.contains%28el%29%29return%20false%3B%0A%20%20%20%20var%20tag%3Del.tagName%3B%0A%20%20%20%20if%28tag%3D%3D%3D%27TEXTAREA%27%29return%20true%3B%0A%20%20%20%20if%28tag%3D%3D%3D%27INPUT%27%29%7B%0A%20%20%20%20%20%20var%20t%3D%28el.getAttribute%28%27type%27%29%7C%7C%27text%27%29.toLowerCase%28%29%3B%0A%20%20%20%20%20%20return%20%5B%27text%27%2C%27search%27%2C%27email%27%2C%27url%27%2C%27tel%27%5D.indexOf%28t%29%21%3D%3D-1%3B%0A%20%20%20%20%7D%0A%20%20%20%20if%28el.isContentEditable%29return%20true%3B%0A%20%20%20%20return%20false%3B%0A%20%20%7D%0A%20%20document.addEventListener%28%27focusin%27%2Cfunction%28e%29%7B%0A%20%20%20%20if%28isTypableField%28e.target%29%29lastFocusedEl%3De.target%3B%0A%20%20%7D%2Ctrue%29%3B%0A%0A%20%20function%20insertIntoField%28el%2Ctext%29%7B%0A%20%20%20%20if%28%21el%29return%20false%3B%0A%20%20%20%20if%28el.tagName%3D%3D%3D%27TEXTAREA%27%7C%7Cel.tagName%3D%3D%3D%27INPUT%27%29%7B%0A%20%20%20%20%20%20var%20start%3Del.selectionStart%3D%3Dnull%3Fel.value.length%3Ael.selectionStart%3B%0A%20%20%20%20%20%20var%20end%3Del.selectionEnd%3D%3Dnull%3Fel.value.length%3Ael.selectionEnd%3B%0A%20%20%20%20%20%20el.value%3Del.value.slice%280%2Cstart%29%2Btext%2Bel.value.slice%28end%29%3B%0A%20%20%20%20%20%20var%20pos%3Dstart%2Btext.length%3B%0A%20%20%20%20%20%20el.setSelectionRange%28pos%2Cpos%29%3B%0A%20%20%20%20%20%20el.dispatchEvent%28new%20Event%28%27input%27%2C%7Bbubbles%3Atrue%7D%29%29%3B%0A%20%20%20%20%20%20el.focus%28%29%3B%0A%20%20%20%20%20%20return%20true%3B%0A%20%20%20%20%7D%0A%20%20%20%20if%28el.isContentEditable%29%7B%0A%20%20%20%20%20%20el.focus%28%29%3B%0A%20%20%20%20%20%20var%20sel%3Dwindow.getSelection%28%29%3B%0A%20%20%20%20%20%20if%28sel%26%26sel.rangeCount%3E0%29%7B%0A%20%20%20%20%20%20%20%20var%20range%3Dsel.getRangeAt%280%29%3B%0A%20%20%20%20%20%20%20%20range.deleteContents%28%29%3B%0A%20%20%20%20%20%20%20%20range.insertNode%28document.createTextNode%28text%29%29%3B%0A%20%20%20%20%20%20%20%20range.collapse%28false%29%3B%0A%20%20%20%20%20%20%7Delse%7B%0A%20%20%20%20%20%20%20%20el.textContent%2B%3Dtext%3B%0A%20%20%20%20%20%20%7D%0A%20%20%20%20%20%20el.dispatchEvent%28new%20Event%28%27input%27%2C%7Bbubbles%3Atrue%7D%29%29%3B%0A%20%20%20%20%20%20return%20true%3B%0A%20%20%20%20%7D%0A%20%20%20%20return%20false%3B%0A%20%20%7D%0A%0A%20%20//%20---%20minimal%20markdown%20renderer%20%28bold%2C%20italics%2C%20inline%20code%2C%20code%20blocks%2C%20line%20breaks%29%20---%0A%20%20function%20escapeHtml%28s%29%7B%0A%20%20%20%20return%20s.replace%28/%26/g%2C%27%26amp%3B%27%29.replace%28/%3C/g%2C%27%26lt%3B%27%29.replace%28/%3E/g%2C%27%26gt%3B%27%29%3B%0A%20%20%7D%0A%20%20function%20renderMarkdown%28text%29%7B%0A%20%20%20%20var%20escaped%3DescapeHtml%28text%29%3B%0A%20%20%20%20escaped%3Descaped.replace%28/%60%60%60%28%5B%5Cs%5CS%5D%2A%3F%29%60%60%60/g%2Cfunction%28m%2Ccode%29%7B%0A%20%20%20%20%20%20return%20%27%3Cpre%20style%3D%22background%3A%230a0b0f%3Bborder%3A1px%20solid%20%232a2b33%3Bborder-radius%3A6px%3Bpadding%3A8px%3Boverflow-x%3Aauto%3Bmargin%3A6px%200%3B%22%3E%3Ccode%20style%3D%22font-family%3AJetBrains%20Mono%2Cmonospace%3Bfont-size%3A11.5px%3B%22%3E%27%2Bcode.trim%28%29%2B%27%3C/code%3E%3C/pre%3E%27%3B%0A%20%20%20%20%7D%29%3B%0A%20%20%20%20escaped%3Descaped.replace%28/%60%28%5B%5E%60%5D%2B%29%60/g%2C%27%3Ccode%20style%3D%22background%3A%230a0b0f%3Bpadding%3A1px%205px%3Bborder-radius%3A4px%3Bfont-family%3AJetBrains%20Mono%2Cmonospace%3Bfont-size%3A12px%3B%22%3E%241%3C/code%3E%27%29%3B%0A%20%20%20%20escaped%3Descaped.replace%28/%5C%2A%5C%2A%28%5B%5E%2A%5D%2B%29%5C%2A%5C%2A/g%2C%27%3Cstrong%3E%241%3C/strong%3E%27%29%3B%0A%20%20%20%20escaped%3Descaped.replace%28/%5C%2A%28%5B%5E%2A%5D%2B%29%5C%2A/g%2C%27%3Cem%3E%241%3C/em%3E%27%29%3B%0A%20%20%20%20escaped%3Descaped.replace%28/%5Cn/g%2C%27%3Cbr%3E%27%29%3B%0A%20%20%20%20return%20escaped%3B%0A%20%20%7D%0A%0A%20%20var%20hostname%3Dlocation.hostname%7C%7C%27page%27%3B%0A%20%20var%20historyKey%3DHISTORY_PREFIX%2Bhostname%3B%0A%20%20var%20systemPrompt%3D%27You%20are%20ClassGPT%2C%20a%20concise%2C%20helpful%20assistant%20embedded%20as%20a%20floating%20widget%20on%20a%20webpage.%20When%20the%20user%20has%20shared%20the%20page%20content%20with%20you%2C%20use%20it%20to%20answer%20questions%2C%20explain%20things%2C%20or%20summarize%20%E2%80%94%20but%20never%20just%20produce%20finished%20answers%20to%20graded%20assignments%2C%20quizzes%2C%20or%20homework%20problems%20on%20their%20behalf%3B%20instead%20help%20them%20understand%20the%20material.%20The%20user%20may%20draft%20messages%20%28replies%2C%20notes%2C%20snippets%29%20that%20they%20write%20themselves%20into%20a%20text%20field%20on%20the%20page%20using%20an%20insert%20button%20you%20provide%20%E2%80%94%20that%20is%20their%20own%20composed%20text%2C%20not%20you%20answering%20questions%20for%20them.%27%3B%0A%20%20var%20messages%3D%5B%7Brole%3A%27system%27%2Ccontent%3AsystemPrompt%7D%5D%3B%0A%0A%20%20var%20msgBox%3Ddocument.getElementById%28%27cg-messages%27%29%3B%0A%20%20var%20contextBar%3Ddocument.getElementById%28%27cg-context-bar%27%29%3B%0A%20%20var%20costBar%3Ddocument.getElementById%28%27cg-cost-bar%27%29%3B%0A%0A%20%20function%20renderMsgBody%28container%2Ctext%29%7B%0A%20%20%20%20if%28settings.markdown%29%7B%0A%20%20%20%20%20%20container.innerHTML%3DrenderMarkdown%28text%29%3B%0A%20%20%20%20%7Delse%7B%0A%20%20%20%20%20%20container.textContent%3Dtext%3B%0A%20%20%20%20%20%20container.style.whiteSpace%3D%27pre-wrap%27%3B%0A%20%20%20%20%7D%0A%20%20%7D%0A%0A%20%20function%20addMsg%28role%2Ctext%29%7B%0A%20%20%20%20var%20d%3Ddocument.createElement%28%27div%27%29%3B%0A%20%20%20%20d.style.margin%3D%270%200%2010px%200%27%3B%0A%20%20%20%20var%20who%3Ddocument.createElement%28%27div%27%29%3B%0A%20%20%20%20who.style.cssText%3D%27font-size%3A11px%3Bfont-weight%3A700%3Bopacity%3A.55%3Bmargin-bottom%3A2px%3Btext-transform%3Auppercase%3Bletter-spacing%3A.4px%3B%27%3B%0A%20%20%20%20who.textContent%3Drole%3D%3D%3D%27user%27%3F%27You%27%3A%27ClassGPT%27%3B%0A%20%20%20%20var%20body%3Ddocument.createElement%28%27div%27%29%3B%0A%20%20%20%20renderMsgBody%28body%2Ctext%29%3B%0A%20%20%20%20d.appendChild%28who%29%3Bd.appendChild%28body%29%3B%0A%0A%20%20%20%20if%28role%3D%3D%3D%27assistant%27%29%7B%0A%20%20%20%20%20%20var%20actions%3Ddocument.createElement%28%27div%27%29%3B%0A%20%20%20%20%20%20actions.style.cssText%3D%27display%3Aflex%3Bgap%3A8px%3Bmargin-top%3A6px%3Bflex-wrap%3Awrap%3B%27%3B%0A%20%20%20%20%20%20var%20copyBtn%3Ddocument.createElement%28%27button%27%29%3B%0A%20%20%20%20%20%20copyBtn.textContent%3D%27copy%27%3B%0A%20%20%20%20%20%20copyBtn.style.cssText%3D%27font-size%3A11px%3Bpadding%3A4px%208px%3Bborder-radius%3A6px%3Bborder%3A1px%20solid%20%232a2b33%3Bbackground%3A%23191a21%3Bcolor%3A%238a8b96%3Bcursor%3Apointer%3B%27%3B%0A%20%20%20%20%20%20copyBtn.onclick%3Dfunction%28%29%7B%0A%20%20%20%20%20%20%20%20navigator.clipboard.writeText%28text%29.then%28function%28%29%7B%0A%20%20%20%20%20%20%20%20%20%20copyBtn.textContent%3D%27copied%27%3B%0A%20%20%20%20%20%20%20%20%20%20setTimeout%28function%28%29%7BcopyBtn.textContent%3D%27copy%27%3B%7D%2C1200%29%3B%0A%20%20%20%20%20%20%20%20%7D%29%3B%0A%20%20%20%20%20%20%7D%3B%0A%20%20%20%20%20%20actions.appendChild%28copyBtn%29%3B%0A%20%20%20%20%20%20if%28settings.allowInsert%29%7B%0A%20%20%20%20%20%20%20%20var%20insertBtn%3Ddocument.createElement%28%27button%27%29%3B%0A%20%20%20%20%20%20%20%20insertBtn.textContent%3D%27insert%20into%20page%27%3B%0A%20%20%20%20%20%20%20%20insertBtn.style.cssText%3D%27font-size%3A11px%3Bpadding%3A4px%208px%3Bborder-radius%3A6px%3Bborder%3A1px%20solid%20%232a2b33%3Bbackground%3A%23191a21%3Bcolor%3A%238a8b96%3Bcursor%3Apointer%3B%27%3B%0A%20%20%20%20%20%20%20%20insertBtn.onclick%3Dfunction%28%29%7B%0A%20%20%20%20%20%20%20%20%20%20if%28%21lastFocusedEl%29%7B%0A%20%20%20%20%20%20%20%20%20%20%20%20insertBtn.textContent%3D%27click%20a%20text%20box%20on%20the%20page%20first%27%3B%0A%20%20%20%20%20%20%20%20%20%20%20%20setTimeout%28function%28%29%7BinsertBtn.textContent%3D%27insert%20into%20page%27%3B%7D%2C1800%29%3B%0A%20%20%20%20%20%20%20%20%20%20%20%20return%3B%0A%20%20%20%20%20%20%20%20%20%20%7D%0A%20%20%20%20%20%20%20%20%20%20var%20ok%3DinsertIntoField%28lastFocusedEl%2Ctext%29%3B%0A%20%20%20%20%20%20%20%20%20%20insertBtn.textContent%3Dok%3F%27inserted%27%3A%27failed%27%3B%0A%20%20%20%20%20%20%20%20%20%20setTimeout%28function%28%29%7BinsertBtn.textContent%3D%27insert%20into%20page%27%3B%7D%2C1200%29%3B%0A%20%20%20%20%20%20%20%20%7D%3B%0A%20%20%20%20%20%20%20%20actions.appendChild%28insertBtn%29%3B%0A%20%20%20%20%20%20%7D%0A%20%20%20%20%20%20d.appendChild%28actions%29%3B%0A%20%20%20%20%7D%0A%0A%20%20%20%20msgBox.appendChild%28d%29%3B%0A%20%20%20%20msgBox.scrollTop%3DmsgBox.scrollHeight%3B%0A%20%20%20%20return%20body%3B%0A%20%20%7D%0A%0A%20%20//%20load%20history%20if%20enabled%0A%20%20if%28settings.rememberHistory%29%7B%0A%20%20%20%20try%7B%0A%20%20%20%20%20%20var%20savedHist%3DJSON.parse%28localStorage.getItem%28historyKey%29%7C%7C%27null%27%29%3B%0A%20%20%20%20%20%20if%28savedHist%26%26savedHist.length%29%7B%0A%20%20%20%20%20%20%20%20savedHist.forEach%28function%28m%29%7B%0A%20%20%20%20%20%20%20%20%20%20messages.push%28m%29%3B%0A%20%20%20%20%20%20%20%20%20%20addMsg%28m.role%2Cm.content%29%3B%0A%20%20%20%20%20%20%20%20%7D%29%3B%0A%20%20%20%20%20%20%7D%0A%20%20%20%20%7Dcatch%28e%29%7B%7D%0A%20%20%7D%0A%0A%20%20function%20persistHistory%28%29%7B%0A%20%20%20%20if%28%21settings.rememberHistory%29return%3B%0A%20%20%20%20var%20toSave%3Dmessages.filter%28function%28m%29%7Breturn%20m.role%21%3D%3D%27system%27%3B%7D%29.slice%28-40%29%3B%0A%20%20%20%20localStorage.setItem%28historyKey%2CJSON.stringify%28toSave%29%29%3B%0A%20%20%7D%0A%0A%20%20function%20extractPageText%28%29%7B%0A%20%20%20%20var%20clone%3Ddocument.body.cloneNode%28true%29%3B%0A%20%20%20%20var%20kill%3Dclone.querySelectorAll%28%27%23classgpt-widget%2Cscript%2Cstyle%2Cnoscript%2Csvg%2Ciframe%27%29%3B%0A%20%20%20%20kill.forEach%28function%28el%29%7Bel.remove%28%29%3B%7D%29%3B%0A%20%20%20%20var%20text%3Dclone.innerText%7C%7Cclone.textContent%7C%7C%27%27%3B%0A%20%20%20%20text%3Dtext.replace%28/%5Cn%7B3%2C%7D/g%2C%27%5Cn%5Cn%27%29.replace%28/%5B%20%5Ct%5D%7B2%2C%7D/g%2C%27%20%27%29.trim%28%29%3B%0A%20%20%20%20var%20MAXLEN%3D12000%3B%0A%20%20%20%20if%28text.length%3EMAXLEN%29%7Btext%3Dtext.slice%280%2CMAXLEN%29%2B%27%5Cn%5Cn%5B...page%20truncated...%5D%27%3B%7D%0A%20%20%20%20return%20text%3B%0A%20%20%7D%0A%0A%20%20document.getElementById%28%27cg-readpage%27%29.onclick%3Dfunction%28%29%7B%0A%20%20%20%20var%20text%3DextractPageText%28%29%3B%0A%20%20%20%20if%28%21text%29%7BaddMsg%28%27assistant%27%2C%22Couldn%27t%20find%20readable%20text%20on%20this%20page.%22%29%3Breturn%3B%7D%0A%20%20%20%20pageContext%3Dtext%3B%0A%20%20%20%20contextBar.style.display%3D%27flex%27%3B%0A%20%20%20%20contextBar.innerHTML%3D%27%3Cspan%3E%26%23128196%3B%20page%20loaded%20%28%27%2Btext.length%2B%27%20chars%29%3C/span%3E%3Cspan%20id%3D%22cg-clear-ctx%22%20style%3D%22cursor%3Apointer%3Bcolor%3A%237c9eff%3B%22%3Eclear%3C/span%3E%27%3B%0A%20%20%20%20document.getElementById%28%27cg-clear-ctx%27%29.onclick%3Dfunction%28%29%7B%0A%20%20%20%20%20%20pageContext%3Dnull%3B%0A%20%20%20%20%20%20contextBar.style.display%3D%27none%27%3B%0A%20%20%20%20%7D%3B%0A%20%20%20%20addMsg%28%27assistant%27%2C%27Got%20the%20page%20%E2%80%94%20ask%20me%20anything%20about%20it%20%28summarize%20it%2C%20explain%20a%20part%2C%20define%20a%20term%2C%20etc%29.%27%29%3B%0A%20%20%7D%3B%0A%0A%20%20//%20voice%20input%0A%20%20var%20recognizing%3Dfalse%3B%0A%20%20var%20SpeechRec%3Dwindow.SpeechRecognition%7C%7Cwindow.webkitSpeechRecognition%3B%0A%20%20var%20micBtn%3Ddocument.getElementById%28%27cg-mic%27%29%3B%0A%20%20if%28%21settings.voiceInput%7C%7C%21SpeechRec%29%7B%0A%20%20%20%20micBtn.style.display%3D%27none%27%3B%0A%20%20%7Delse%7B%0A%20%20%20%20var%20recognition%3Dnew%20SpeechRec%28%29%3B%0A%20%20%20%20recognition.continuous%3Dfalse%3B%0A%20%20%20%20recognition.interimResults%3Dfalse%3B%0A%20%20%20%20recognition.onresult%3Dfunction%28e%29%7B%0A%20%20%20%20%20%20var%20transcript%3De.results%5B0%5D%5B0%5D.transcript%3B%0A%20%20%20%20%20%20var%20input%3Ddocument.getElementById%28%27cg-input%27%29%3B%0A%20%20%20%20%20%20input.value%3D%28input.value%3Finput.value%2B%27%20%27%3A%27%27%29%2Btranscript%3B%0A%20%20%20%20%7D%3B%0A%20%20%20%20recognition.onend%3Dfunction%28%29%7Brecognizing%3Dfalse%3BmicBtn.style.opacity%3D%27.7%27%3B%7D%3B%0A%20%20%20%20micBtn.onclick%3Dfunction%28%29%7B%0A%20%20%20%20%20%20if%28recognizing%29return%3B%0A%20%20%20%20%20%20recognizing%3Dtrue%3B%0A%20%20%20%20%20%20micBtn.style.opacity%3D%271%27%3B%0A%20%20%20%20%20%20try%7Brecognition.start%28%29%3B%7Dcatch%28e%29%7Brecognizing%3Dfalse%3B%7D%0A%20%20%20%20%7D%3B%0A%20%20%7D%0A%0A%20%20//%20rough%20cost%20estimate%20%28very%20approximate%2C%20%24%20per%201M%20input%20tokens%2C%20heuristic%204%20chars/token%29%0A%20%20function%20estimateCost%28%29%7B%0A%20%20%20%20var%20preset%3DMODEL_PRESETS.find%28function%28p%29%7Breturn%20p.id%3D%3D%3Dsettings.model%3B%7D%29%3B%0A%20%20%20%20if%28%21preset%7C%7Cpreset.price%3D%3Dnull%29%7BcostBar.style.display%3D%27none%27%3Breturn%3B%7D%0A%20%20%20%20var%20totalChars%3Dmessages.reduce%28function%28a%2Cm%29%7Breturn%20a%2B%28m.content%3Fm.content.length%3A0%29%3B%7D%2C0%29%3B%0A%20%20%20%20var%20tokens%3DMath.round%28totalChars/4%29%3B%0A%20%20%20%20var%20cost%3D%28tokens/1000000%29%2Apreset.price%3B%0A%20%20%20%20costBar.style.display%3D%27block%27%3B%0A%20%20%20%20costBar.textContent%3D%27~%27%2Btokens%2B%27%20tokens%20this%20session%20%C2%B7%20~%24%27%2Bcost.toFixed%284%29%2B%27%20est.%27%3B%0A%20%20%7D%0A%0A%20%20async%20function%20send%28%29%7B%0A%20%20%20%20var%20input%3Ddocument.getElementById%28%27cg-input%27%29%3B%0A%20%20%20%20var%20text%3Dinput.value.trim%28%29%3B%0A%20%20%20%20if%28%21text%29return%3B%0A%20%20%20%20input.value%3D%27%27%3B%0A%20%20%20%20addMsg%28%27user%27%2Ctext%29%3B%0A%0A%20%20%20%20var%20outgoing%3Dmessages.slice%28%29%3B%0A%20%20%20%20if%28pageContext%29%7B%0A%20%20%20%20%20%20outgoing.push%28%7Brole%3A%27system%27%2Ccontent%3A%27Content%20of%20the%20current%20webpage%20%28title%3A%20%27%2Bdocument.title%2B%27%2C%20url%3A%20%27%2Blocation.href%2B%27%29%3A%5Cn%5Cn%27%2BpageContext%7D%29%3B%0A%20%20%20%20%7D%0A%20%20%20%20messages.push%28%7Brole%3A%27user%27%2Ccontent%3Atext%7D%29%3B%0A%20%20%20%20outgoing.push%28%7Brole%3A%27user%27%2Ccontent%3Atext%7D%29%3B%0A%20%20%20%20persistHistory%28%29%3B%0A%20%20%20%20if%28settings.showCost%29estimateCost%28%29%3B%0A%0A%20%20%20%20var%20thinking%3DaddMsg%28%27assistant%27%2C%27...%27%29%3B%0A%20%20%20%20try%7B%0A%20%20%20%20%20%20var%20res%3Dawait%20fetch%28%27https%3A//openrouter.ai/api/v1/chat/completions%27%2C%7B%0A%20%20%20%20%20%20%20%20method%3A%27POST%27%2C%0A%20%20%20%20%20%20%20%20headers%3A%7B%0A%20%20%20%20%20%20%20%20%20%20%27Content-Type%27%3A%27application/json%27%2C%0A%20%20%20%20%20%20%20%20%20%20%27Authorization%27%3A%27Bearer%20%27%2BapiKey%2C%0A%20%20%20%20%20%20%20%20%20%20%27HTTP-Referer%27%3Alocation.href%2C%0A%20%20%20%20%20%20%20%20%20%20%27X-Title%27%3A%27ClassGPT%27%0A%20%20%20%20%20%20%20%20%7D%2C%0A%20%20%20%20%20%20%20%20body%3AJSON.stringify%28%7Bmodel%3AactiveModel%28%29%2Cmessages%3Aoutgoing%7D%29%0A%20%20%20%20%20%20%7D%29%3B%0A%20%20%20%20%20%20var%20data%3Dawait%20res.json%28%29%3B%0A%20%20%20%20%20%20if%28data.error%29%7B%0A%20%20%20%20%20%20%20%20renderMsgBody%28thinking%2C%27Error%3A%20%27%2Bdata.error.message%29%3B%0A%20%20%20%20%20%20%20%20return%3B%0A%20%20%20%20%20%20%7D%0A%20%20%20%20%20%20var%20reply%3D%28data.choices%26%26data.choices%5B0%5D%26%26data.choices%5B0%5D.message%26%26data.choices%5B0%5D.message.content%29%7C%7C%27No%20response.%27%3B%0A%20%20%20%20%20%20renderMsgBody%28thinking%2Creply%29%3B%0A%20%20%20%20%20%20messages.push%28%7Brole%3A%27assistant%27%2Ccontent%3Areply%7D%29%3B%0A%20%20%20%20%20%20persistHistory%28%29%3B%0A%20%20%20%20%20%20if%28settings.showCost%29estimateCost%28%29%3B%0A%20%20%20%20%7Dcatch%28e%29%7B%0A%20%20%20%20%20%20renderMsgBody%28thinking%2C%27Error%3A%20%27%2Be.message%29%3B%0A%20%20%20%20%7D%0A%20%20%7D%0A%20%20document.getElementById%28%27cg-send%27%29.onclick%3Dsend%3B%0A%20%20document.getElementById%28%27cg-input%27%29.addEventListener%28%27keydown%27%2Cfunction%28e%29%7B%0A%20%20%20%20if%28e.key%3D%3D%3D%27Enter%27%29send%28%29%3B%0A%20%20%7D%29%3B%0A%0A%20%20//%20%3D%3D%3D%3D%3D%20settings%20panel%20%3D%3D%3D%3D%3D%0A%20%20var%20chatView%3Ddocument.getElementById%28%27cg-view-chat%27%29%3B%0A%20%20var%20settingsView%3Ddocument.getElementById%28%27cg-view-settings%27%29%3B%0A%0A%20%20function%20fieldRow%28labelText%2CinputEl%29%7B%0A%20%20%20%20var%20row%3Ddocument.createElement%28%27div%27%29%3B%0A%20%20%20%20row.style.cssText%3D%27margin-bottom%3A14px%3B%27%3B%0A%20%20%20%20var%20label%3Ddocument.createElement%28%27div%27%29%3B%0A%20%20%20%20label.textContent%3DlabelText%3B%0A%20%20%20%20label.style.cssText%3D%27font-size%3A11px%3Bcolor%3A%238a8b96%3Bmargin-bottom%3A5px%3Btext-transform%3Auppercase%3Bletter-spacing%3A.3px%3B%27%3B%0A%20%20%20%20row.appendChild%28label%29%3B%0A%20%20%20%20row.appendChild%28inputEl%29%3B%0A%20%20%20%20return%20row%3B%0A%20%20%7D%0A%20%20function%20toggleRow%28labelText%2Ckey%29%7B%0A%20%20%20%20var%20row%3Ddocument.createElement%28%27label%27%29%3B%0A%20%20%20%20row.style.cssText%3D%27display%3Aflex%3Balign-items%3Acenter%3Bjustify-content%3Aspace-between%3Bpadding%3A9px%200%3Bborder-bottom%3A1px%20solid%20%2322232b%3Bcursor%3Apointer%3Bfont-size%3A12.5px%3B%27%3B%0A%20%20%20%20var%20span%3Ddocument.createElement%28%27span%27%29%3B%0A%20%20%20%20span.textContent%3DlabelText%3B%0A%20%20%20%20var%20cb%3Ddocument.createElement%28%27input%27%29%3B%0A%20%20%20%20cb.type%3D%27checkbox%27%3B%0A%20%20%20%20cb.checked%3D%21%21settings%5Bkey%5D%3B%0A%20%20%20%20cb.style.cssText%3D%27width%3A16px%3Bheight%3A16px%3Baccent-color%3A%237c9eff%3Bcursor%3Apointer%3B%27%3B%0A%20%20%20%20cb.onchange%3Dfunction%28%29%7B%0A%20%20%20%20%20%20settings%5Bkey%5D%3Dcb.checked%3B%0A%20%20%20%20%20%20saveSettings%28settings%29%3B%0A%20%20%20%20%20%20applySettingsSideEffects%28%29%3B%0A%20%20%20%20%7D%3B%0A%20%20%20%20row.appendChild%28span%29%3Brow.appendChild%28cb%29%3B%0A%20%20%20%20return%20row%3B%0A%20%20%7D%0A%0A%20%20function%20applySettingsSideEffects%28%29%7B%0A%20%20%20%20compact%3Dsettings.compact%3B%0A%20%20%20%20applySize%28%29%3B%0A%20%20%20%20if%28%21settings.voiceInput%7C%7C%21SpeechRec%29%7BmicBtn.style.display%3D%27none%27%3B%7Delse%7BmicBtn.style.display%3D%27inline-block%27%3B%7D%0A%20%20%20%20if%28%21settings.showCost%29%7BcostBar.style.display%3D%27none%27%3B%7D%0A%20%20%7D%0A%0A%20%20function%20buildSettingsView%28%29%7B%0A%20%20%20%20settingsView.innerHTML%3D%27%27%3B%0A%0A%20%20%20%20var%20backBtn%3Ddocument.createElement%28%27button%27%29%3B%0A%20%20%20%20backBtn.textContent%3D%27%E2%86%90%20back%20to%20chat%27%3B%0A%20%20%20%20backBtn.style.cssText%3D%27background%3Anone%3Bborder%3Anone%3Bcolor%3A%237c9eff%3Bfont-size%3A12.5px%3Bcursor%3Apointer%3Bpadding%3A0%200%2014px%3Btext-align%3Aleft%3B%27%3B%0A%20%20%20%20backBtn.onclick%3Dfunction%28%29%7B%0A%20%20%20%20%20%20settingsView.style.display%3D%27none%27%3B%0A%20%20%20%20%20%20chatView.style.display%3D%27flex%27%3B%0A%20%20%20%20%7D%3B%0A%20%20%20%20settingsView.appendChild%28backBtn%29%3B%0A%0A%20%20%20%20//%20API%20key%0A%20%20%20%20var%20keyInput%3Ddocument.createElement%28%27input%27%29%3B%0A%20%20%20%20keyInput.type%3D%27password%27%3B%0A%20%20%20%20keyInput.value%3DapiKey%7C%7C%27%27%3B%0A%20%20%20%20keyInput.style.cssText%3D%27width%3A100%25%3Bpadding%3A8px%3Bborder-radius%3A6px%3Bborder%3A1px%20solid%20%232a2b33%3Bbackground%3A%230a0b0f%3Bcolor%3A%23e9e9ef%3Bfont-family%3Amonospace%3Bfont-size%3A11.5px%3B%27%3B%0A%20%20%20%20keyInput.onchange%3Dfunction%28%29%7B%0A%20%20%20%20%20%20apiKey%3DkeyInput.value.trim%28%29%3B%0A%20%20%20%20%20%20localStorage.setItem%28%27classgpt_api_key%27%2CapiKey%29%3B%0A%20%20%20%20%7D%3B%0A%20%20%20%20settingsView.appendChild%28fieldRow%28%27OpenRouter%20API%20key%27%2CkeyInput%29%29%3B%0A%0A%20%20%20%20//%20model%20dropdown%0A%20%20%20%20var%20modelSelect%3Ddocument.createElement%28%27select%27%29%3B%0A%20%20%20%20modelSelect.style.cssText%3D%27width%3A100%25%3Bpadding%3A8px%3Bborder-radius%3A6px%3Bborder%3A1px%20solid%20%232a2b33%3Bbackground%3A%230a0b0f%3Bcolor%3A%23e9e9ef%3Bfont-size%3A12.5px%3B%27%3B%0A%20%20%20%20MODEL_PRESETS.forEach%28function%28p%29%7B%0A%20%20%20%20%20%20var%20opt%3Ddocument.createElement%28%27option%27%29%3B%0A%20%20%20%20%20%20opt.value%3Dp.id%3Bopt.textContent%3Dp.label%3B%0A%20%20%20%20%20%20if%28p.id%3D%3D%3Dsettings.model%29opt.selected%3Dtrue%3B%0A%20%20%20%20%20%20modelSelect.appendChild%28opt%29%3B%0A%20%20%20%20%7D%29%3B%0A%20%20%20%20var%20customWrap%3Ddocument.createElement%28%27div%27%29%3B%0A%20%20%20%20customWrap.style.cssText%3D%27margin-top%3A8px%3B%27%2B%28settings.model%3D%3D%3D%27custom%27%3F%27%27%3A%27display%3Anone%3B%27%29%3B%0A%20%20%20%20var%20customInput%3Ddocument.createElement%28%27input%27%29%3B%0A%20%20%20%20customInput.placeholder%3D%27provider/model-id%27%3B%0A%20%20%20%20customInput.value%3Dsettings.customModel%7C%7C%27%27%3B%0A%20%20%20%20customInput.style.cssText%3D%27width%3A100%25%3Bpadding%3A8px%3Bborder-radius%3A6px%3Bborder%3A1px%20solid%20%232a2b33%3Bbackground%3A%230a0b0f%3Bcolor%3A%23e9e9ef%3Bfont-family%3Amonospace%3Bfont-size%3A11.5px%3B%27%3B%0A%20%20%20%20customInput.onchange%3Dfunction%28%29%7B%0A%20%20%20%20%20%20settings.customModel%3DcustomInput.value.trim%28%29%3B%0A%20%20%20%20%20%20saveSettings%28settings%29%3B%0A%20%20%20%20%7D%3B%0A%20%20%20%20customWrap.appendChild%28customInput%29%3B%0A%20%20%20%20modelSelect.onchange%3Dfunction%28%29%7B%0A%20%20%20%20%20%20settings.model%3DmodelSelect.value%3B%0A%20%20%20%20%20%20saveSettings%28settings%29%3B%0A%20%20%20%20%20%20customWrap.style.display%3Dsettings.model%3D%3D%3D%27custom%27%3F%27block%27%3A%27none%27%3B%0A%20%20%20%20%7D%3B%0A%20%20%20%20var%20modelWrap%3Ddocument.createElement%28%27div%27%29%3B%0A%20%20%20%20modelWrap.appendChild%28modelSelect%29%3B%0A%20%20%20%20modelWrap.appendChild%28customWrap%29%3B%0A%20%20%20%20settingsView.appendChild%28fieldRow%28%27Model%27%2CmodelWrap%29%29%3B%0A%0A%20%20%20%20//%20feature%20toggles%0A%20%20%20%20var%20togglesHeader%3Ddocument.createElement%28%27div%27%29%3B%0A%20%20%20%20togglesHeader.textContent%3D%27Features%27%3B%0A%20%20%20%20togglesHeader.style.cssText%3D%27font-size%3A11px%3Bcolor%3A%238a8b96%3Bmargin%3A16px%200%204px%3Btext-transform%3Auppercase%3Bletter-spacing%3A.3px%3B%27%3B%0A%20%20%20%20settingsView.appendChild%28togglesHeader%29%3B%0A%0A%20%20%20%20settingsView.appendChild%28toggleRow%28%27Markdown%20rendering%27%2C%27markdown%27%29%29%3B%0A%20%20%20%20settingsView.appendChild%28toggleRow%28%27Remember%20chat%20on%20this%20site%27%2C%27rememberHistory%27%29%29%3B%0A%20%20%20%20settingsView.appendChild%28toggleRow%28%27Remember%20widget%20position%27%2C%27rememberPosition%27%29%29%3B%0A%20%20%20%20settingsView.appendChild%28toggleRow%28%27Show%20token/cost%20estimate%27%2C%27showCost%27%29%29%3B%0A%20%20%20%20settingsView.appendChild%28toggleRow%28%27Allow%20%22insert%20into%20page%22%27%2C%27allowInsert%27%29%29%3B%0A%20%20%20%20settingsView.appendChild%28toggleRow%28%27Compact%20size%27%2C%27compact%27%29%29%3B%0A%20%20%20%20settingsView.appendChild%28toggleRow%28%27Voice%20input%20%28mic%20button%29%27%2C%27voiceInput%27%29%29%3B%0A%20%20%20%20settingsView.appendChild%28toggleRow%28%27Ctrl%2BShift%2BG%20to%20show/hide%27%2C%27keyboardShortcut%27%29%29%3B%0A%0A%20%20%20%20//%20export%0A%20%20%20%20var%20exportBtn%3Ddocument.createElement%28%27button%27%29%3B%0A%20%20%20%20exportBtn.textContent%3D%27Export%20this%20chat%20%28.txt%29%27%3B%0A%20%20%20%20exportBtn.style.cssText%3D%27width%3A100%25%3Bmargin-top%3A16px%3Bpadding%3A9px%3Bborder-radius%3A8px%3Bborder%3A1px%20solid%20%232a2b33%3Bbackground%3A%23191a21%3Bcolor%3A%23e9e9ef%3Bcursor%3Apointer%3Bfont-size%3A12px%3B%27%3B%0A%20%20%20%20exportBtn.onclick%3Dfunction%28%29%7B%0A%20%20%20%20%20%20var%20lines%3Dmessages.filter%28function%28m%29%7Breturn%20m.role%21%3D%3D%27system%27%3B%7D%29.map%28function%28m%29%7B%0A%20%20%20%20%20%20%20%20return%20%28m.role%3D%3D%3D%27user%27%3F%27You%3A%20%27%3A%27ClassGPT%3A%20%27%29%2Bm.content%3B%0A%20%20%20%20%20%20%7D%29%3B%0A%20%20%20%20%20%20var%20blob%3Dnew%20Blob%28%5Blines.join%28%27%5Cn%5Cn%27%29%5D%2C%7Btype%3A%27text/plain%27%7D%29%3B%0A%20%20%20%20%20%20var%20a%3Ddocument.createElement%28%27a%27%29%3B%0A%20%20%20%20%20%20a.href%3DURL.createObjectURL%28blob%29%3B%0A%20%20%20%20%20%20a.download%3D%27classgpt-chat.txt%27%3B%0A%20%20%20%20%20%20a.click%28%29%3B%0A%20%20%20%20%7D%3B%0A%20%20%20%20settingsView.appendChild%28exportBtn%29%3B%0A%0A%20%20%20%20var%20clearHistBtn%3Ddocument.createElement%28%27button%27%29%3B%0A%20%20%20%20clearHistBtn.textContent%3D%27Clear%20saved%20history%20for%20this%20site%27%3B%0A%20%20%20%20clearHistBtn.style.cssText%3D%27width%3A100%25%3Bmargin-top%3A8px%3Bpadding%3A9px%3Bborder-radius%3A8px%3Bborder%3A1px%20solid%20%232a2b33%3Bbackground%3A%23191a21%3Bcolor%3A%238a8b96%3Bcursor%3Apointer%3Bfont-size%3A12px%3B%27%3B%0A%20%20%20%20clearHistBtn.onclick%3Dfunction%28%29%7B%0A%20%20%20%20%20%20localStorage.removeItem%28historyKey%29%3B%0A%20%20%20%20%20%20clearHistBtn.textContent%3D%27cleared%27%3B%0A%20%20%20%20%20%20setTimeout%28function%28%29%7BclearHistBtn.textContent%3D%27Clear%20saved%20history%20for%20this%20site%27%3B%7D%2C1200%29%3B%0A%20%20%20%20%7D%3B%0A%20%20%20%20settingsView.appendChild%28clearHistBtn%29%3B%0A%20%20%7D%0A%0A%20%20document.getElementById%28%27cg-settings-btn%27%29.onclick%3Dfunction%28%29%7B%0A%20%20%20%20buildSettingsView%28%29%3B%0A%20%20%20%20chatView.style.display%3D%27none%27%3B%0A%20%20%20%20settingsView.style.display%3D%27flex%27%3B%0A%20%20%7D%3B%0A%0A%20%20applySettingsSideEffects%28%29%3B%0A%20%20document.getElementById%28%27cg-input%27%29.focus%28%29%3B%0A%7D%29%28%29%3B%0A" onclick="return false;">↳ ClassGPT</a>
+    <span class="drag-hint">drag this to your bookmarks bar</span>
+  </div>
+
+  <ol class="steps">
+    <li>
+      <div>
+        <h3>Show your bookmarks bar</h3>
+        <p>Ctrl/Cmd + Shift + B in Chrome, Edge, or Firefox, if it isn't already showing.</p>
+      </div>
+    </li>
+    <li>
+      <div>
+        <h3>Drag the ClassGPT button up there</h3>
+        <p>It's a real link — drag it straight into the bookmarks bar. On phones, use the browser's "add bookmark" flow and paste the code from the box below instead.</p>
+      </div>
+    </li>
+    <li>
+      <div>
+        <h3>Click it on any site</h3>
+        <p>If you baked in a key above, it opens straight into the chat, ready to go, every time. Click the bookmark again (or Ctrl+Shift+G, if that's on) to show or hide it without losing your chat.</p>
+      </div>
+    </li>
+    <li>
+      <div>
+        <h3>Open the gear icon for settings</h3>
+        <p>Pick a model from the dropdown, and flip on whichever features you want — everything's off or on a sensible default to start, and it's all saved in that browser for next time.</p>
+      </div>
+    </li>
+  </ol>
+
+  <div class="panel">
+    <h2>What's in the settings panel</h2>
+    <p>Click the gear inside the widget to get here — it's a real panel now, not popup prompts.</p>
+    <div class="feature-grid">
+      <div><strong>Model picker</strong>Dropdown of a few presets, or type a custom model id. Defaults to GPT-4o mini.</div>
+      <div><strong>Markdown rendering</strong>Bold, inline code, and code blocks render properly instead of showing raw asterisks.</div>
+      <div><strong>Remember chat per site</strong>Reopen the widget on the same site later and your conversation is still there.</div>
+      <div><strong>Remember position</strong>Keeps the widget wherever you last dragged it instead of resetting to the corner.</div>
+      <div><strong>Cost estimate</strong>A rough running token/cost estimate for the session, shown under the chat.</div>
+      <div><strong>Insert into page toggle</strong>Turn the "insert into page" button off entirely for a read-only mode.</div>
+      <div><strong>Compact mode</strong>A smaller widget footprint if the full size gets in the way.</div>
+      <div><strong>Voice input</strong>Mic button next to the message box, using your browser's built-in speech recognition.</div>
+      <div><strong>Keyboard shortcut</strong>Ctrl+Shift+G shows or hides the widget without re-clicking the bookmark.</div>
+      <div><strong>Export chat</strong>Download the current conversation as a .txt file from the settings panel.</div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>Try it on this page first</h2>
+    <p>Launch the widget, open the gear icon to look through settings, click into the scratchpad below, ask it to draft something, then hit "insert into page" on its reply.</p>
+    <button class="try-btn" id="try-it">▸ launch preview</button>
+    <div class="scratch">
+      <label>scratchpad — click here before hitting insert</label>
+      <textarea placeholder="Click here, then use 'insert into page' on a ClassGPT reply..."></textarea>
+    </div>
+    <div class="fallback">
+      Drag-and-drop not working (some mobile browsers strip it)? Copy this into a new bookmark's URL field manually — build your keyed version above first, then copy from here:
+      <code id="raw-code">javascript:%28function%28%29%7B%0A%20%20var%20EXISTING%3Ddocument.getElementById%28%27classgpt-widget%27%29%3B%0A%20%20if%28EXISTING%29%7B%0A%20%20%20%20EXISTING.style.display%20%3D%20EXISTING.style.display%3D%3D%3D%27none%27%20%3F%20%27flex%27%20%3A%20%27none%27%3B%0A%20%20%20%20return%3B%0A%20%20%7D%0A%0A%20%20var%20SETTINGS_KEY%3D%27classgpt_settings%27%3B%0A%20%20var%20HISTORY_PREFIX%3D%27classgpt_history_%27%3B%0A%20%20var%20POSITION_KEY%3D%27classgpt_position%27%3B%0A%20%20var%20BAKED_KEY%3D%27__API_KEY__%27%3B%0A%0A%20%20var%20MODEL_PRESETS%3D%5B%0A%20%20%20%20%7Bid%3A%27openai/gpt-4o-mini%27%2Clabel%3A%27GPT-4o%20mini%20%28default%29%27%2Cprice%3A0.15%7D%2C%0A%20%20%20%20%7Bid%3A%27openai/gpt-4o%27%2Clabel%3A%27GPT-4o%27%2Cprice%3A2.5%7D%2C%0A%20%20%20%20%7Bid%3A%27anthropic/claude-3.5-haiku%27%2Clabel%3A%27Claude%203.5%20Haiku%27%2Cprice%3A0.8%7D%2C%0A%20%20%20%20%7Bid%3A%27anthropic/claude-3.5-sonnet%27%2Clabel%3A%27Claude%203.5%20Sonnet%27%2Cprice%3A3%7D%2C%0A%20%20%20%20%7Bid%3A%27google/gemini-2.0-flash-001%27%2Clabel%3A%27Gemini%202.0%20Flash%27%2Cprice%3A0.1%7D%2C%0A%20%20%20%20%7Bid%3A%27custom%27%2Clabel%3A%27Custom%20model%20id...%27%2Cprice%3Anull%7D%0A%20%20%5D%3B%0A%0A%20%20var%20DEFAULT_SETTINGS%3D%7B%0A%20%20%20%20model%3A%27openai/gpt-4o-mini%27%2C%0A%20%20%20%20customModel%3A%27%27%2C%0A%20%20%20%20markdown%3Atrue%2C%0A%20%20%20%20rememberHistory%3Afalse%2C%0A%20%20%20%20rememberPosition%3Afalse%2C%0A%20%20%20%20showCost%3Atrue%2C%0A%20%20%20%20allowInsert%3Atrue%2C%0A%20%20%20%20compact%3Afalse%2C%0A%20%20%20%20voiceInput%3Atrue%2C%0A%20%20%20%20keyboardShortcut%3Atrue%0A%20%20%7D%3B%0A%0A%20%20function%20loadSettings%28%29%7B%0A%20%20%20%20try%7B%0A%20%20%20%20%20%20var%20raw%3DlocalStorage.getItem%28SETTINGS_KEY%29%3B%0A%20%20%20%20%20%20if%28%21raw%29return%20Object.assign%28%7B%7D%2CDEFAULT_SETTINGS%29%3B%0A%20%20%20%20%20%20var%20parsed%3DJSON.parse%28raw%29%3B%0A%20%20%20%20%20%20return%20Object.assign%28%7B%7D%2CDEFAULT_SETTINGS%2Cparsed%29%3B%0A%20%20%20%20%7Dcatch%28e%29%7Breturn%20Object.assign%28%7B%7D%2CDEFAULT_SETTINGS%29%3B%7D%0A%20%20%7D%0A%20%20function%20saveSettings%28s%29%7B%0A%20%20%20%20localStorage.setItem%28SETTINGS_KEY%2CJSON.stringify%28s%29%29%3B%0A%20%20%7D%0A%0A%20%20var%20settings%3DloadSettings%28%29%3B%0A%20%20var%20apiKey%3D%28BAKED_KEY%26%26BAKED_KEY.indexOf%28%27API_KEY%27%29%3D%3D%3D-1%29%3FBAKED_KEY%3AlocalStorage.getItem%28%27classgpt_api_key%27%29%3B%0A%20%20if%28%21apiKey%29%7B%0A%20%20%20%20apiKey%3Dprompt%28%27Paste%20your%20OpenRouter%20API%20key%20%28get%20one%20free%20at%20openrouter.ai/keys%29%3A%27%29%3B%0A%20%20%20%20if%28%21apiKey%29return%3B%0A%20%20%20%20localStorage.setItem%28%27classgpt_api_key%27%2CapiKey%29%3B%0A%20%20%7Delse%20if%28%21localStorage.getItem%28%27classgpt_api_key%27%29%29%7B%0A%20%20%20%20localStorage.setItem%28%27classgpt_api_key%27%2CapiKey%29%3B%0A%20%20%7D%0A%0A%20%20function%20activeModel%28%29%7B%0A%20%20%20%20return%20settings.model%3D%3D%3D%27custom%27%20%3F%20%28settings.customModel%7C%7C%27openai/gpt-4o-mini%27%29%20%3A%20settings.model%3B%0A%20%20%7D%0A%0A%20%20var%20pageContext%3Dnull%3B%0A%20%20var%20compact%3Dsettings.compact%3B%0A%0A%20%20var%20box%3Ddocument.createElement%28%27div%27%29%3B%0A%20%20box.id%3D%27classgpt-widget%27%3B%0A%20%20function%20boxSize%28%29%7B%0A%20%20%20%20return%20compact%20%3F%20%7Bw%3A280%2Ch%3A380%7D%20%3A%20%7Bw%3A340%2Ch%3A520%7D%3B%0A%20%20%7D%0A%20%20function%20applySize%28%29%7B%0A%20%20%20%20var%20sz%3DboxSize%28%29%3B%0A%20%20%20%20box.style.width%3Dsz.w%2B%27px%27%3B%0A%20%20%20%20box.style.height%3Dsz.h%2B%27px%27%3B%0A%20%20%7D%0A%20%20box.style.cssText%3D%27position%3Afixed%3Bbottom%3A20px%3Bright%3A20px%3Bbackground%3A%2314151a%3Bcolor%3A%23e9e9ef%3Bborder-radius%3A14px%3Bbox-shadow%3A0%2012px%2040px%20rgba%280%2C0%2C0%2C.5%29%3Bz-index%3A2147483647%3Bdisplay%3Aflex%3Bflex-direction%3Acolumn%3Bfont-family%3A-apple-system%2CBlinkMacSystemFont%2CSegoe%20UI%2CRoboto%2Csans-serif%3Boverflow%3Ahidden%3Bborder%3A1px%20solid%20%232a2b33%3B%27%3B%0A%20%20applySize%28%29%3B%0A%0A%20%20if%28settings.rememberPosition%29%7B%0A%20%20%20%20try%7B%0A%20%20%20%20%20%20var%20pos%3DJSON.parse%28localStorage.getItem%28POSITION_KEY%29%7C%7C%27null%27%29%3B%0A%20%20%20%20%20%20if%28pos%26%26pos.left%26%26pos.top%29%7B%0A%20%20%20%20%20%20%20%20box.style.left%3Dpos.left%3Bbox.style.top%3Dpos.top%3B%0A%20%20%20%20%20%20%20%20box.style.right%3D%27auto%27%3Bbox.style.bottom%3D%27auto%27%3B%0A%20%20%20%20%20%20%7D%0A%20%20%20%20%7Dcatch%28e%29%7B%7D%0A%20%20%7D%0A%0A%20%20box.innerHTML%3D%0A%20%20%20%20%27%3Cdiv%20id%3D%22cg-header%22%20style%3D%22padding%3A10px%2012px%3Bbackground%3A%231c1d24%3Bcursor%3Amove%3Bdisplay%3Aflex%3Bjustify-content%3Aspace-between%3Balign-items%3Acenter%3Bborder-bottom%3A1px%20solid%20%232a2b33%3Bflex-shrink%3A0%3B%22%3E%27%2B%0A%20%20%20%20%20%20%27%3Cspan%20style%3D%22font-weight%3A700%3Bletter-spacing%3A.2px%3Bfont-size%3A14px%3B%22%3EClass%3Cspan%20style%3D%22color%3A%237c9eff%3B%22%3EGPT%3C/span%3E%3C/span%3E%27%2B%0A%20%20%20%20%20%20%27%3Cspan%20style%3D%22display%3Aflex%3Bgap%3A10px%3Balign-items%3Acenter%3B%22%3E%27%2B%0A%20%20%20%20%20%20%20%20%27%3Cspan%20id%3D%22cg-settings-btn%22%20title%3D%22Settings%22%20style%3D%22cursor%3Apointer%3Bopacity%3A.7%3Bfont-size%3A14px%3B%22%3E%26%239881%3B%3C/span%3E%27%2B%0A%20%20%20%20%20%20%20%20%27%3Cspan%20id%3D%22cg-close%22%20title%3D%22Close%22%20style%3D%22cursor%3Apointer%3Bopacity%3A.7%3Bfont-size%3A15px%3B%22%3E%26%2310005%3B%3C/span%3E%27%2B%0A%20%20%20%20%20%20%27%3C/span%3E%27%2B%0A%20%20%20%20%27%3C/div%3E%27%2B%0A%20%20%20%20%27%3Cdiv%20id%3D%22cg-view-chat%22%20style%3D%22display%3Aflex%3Bflex-direction%3Acolumn%3Bflex%3A1%3Bmin-height%3A0%3B%22%3E%27%2B%0A%20%20%20%20%20%20%27%3Cdiv%20id%3D%22cg-messages%22%20style%3D%22flex%3A1%3Boverflow-y%3Aauto%3Bpadding%3A12px%3Bfont-size%3A13.5px%3Bline-height%3A1.45%3B%22%3E%3C/div%3E%27%2B%0A%20%20%20%20%20%20%27%3Cdiv%20id%3D%22cg-context-bar%22%20style%3D%22display%3Anone%3Bpadding%3A6px%2012px%3Bbackground%3A%231c1d24%3Bborder-top%3A1px%20solid%20%232a2b33%3Bfont-size%3A11.5px%3Bcolor%3A%238a8b96%3Balign-items%3Acenter%3Bjustify-content%3Aspace-between%3B%22%3E%3C/div%3E%27%2B%0A%20%20%20%20%20%20%27%3Cdiv%20id%3D%22cg-cost-bar%22%20style%3D%22display%3Anone%3Bpadding%3A4px%2012px%3Bfont-size%3A10.5px%3Bcolor%3A%235f606a%3Bfont-family%3Amonospace%3B%22%3E%3C/div%3E%27%2B%0A%20%20%20%20%20%20%27%3Cdiv%20style%3D%22display%3Aflex%3Bgap%3A6px%3Bpadding%3A10px%3Bborder-top%3A1px%20solid%20%232a2b33%3Bbackground%3A%2317181f%3Bflex-shrink%3A0%3B%22%3E%27%2B%0A%20%20%20%20%20%20%20%20%27%3Cbutton%20id%3D%22cg-readpage%22%20title%3D%22Read%20this%20page%22%20style%3D%22padding%3A8px%209px%3Bborder-radius%3A8px%3Bborder%3A1px%20solid%20%232a2b33%3Bbackground%3A%230f1015%3Bcolor%3A%23e9e9ef%3Bcursor%3Apointer%3Bfont-size%3A13px%3B%22%3E%26%23128196%3B%3C/button%3E%27%2B%0A%20%20%20%20%20%20%20%20%27%3Cbutton%20id%3D%22cg-mic%22%20title%3D%22Voice%20input%22%20style%3D%22padding%3A8px%209px%3Bborder-radius%3A8px%3Bborder%3A1px%20solid%20%232a2b33%3Bbackground%3A%230f1015%3Bcolor%3A%23e9e9ef%3Bcursor%3Apointer%3Bfont-size%3A13px%3B%22%3E%26%23127908%3B%3C/button%3E%27%2B%0A%20%20%20%20%20%20%20%20%27%3Cinput%20id%3D%22cg-input%22%20style%3D%22flex%3A1%3Bpadding%3A8px%2010px%3Bborder-radius%3A8px%3Bborder%3A1px%20solid%20%232a2b33%3Bbackground%3A%230f1015%3Bcolor%3A%23e9e9ef%3Boutline%3Anone%3Bfont-size%3A13px%3Bmin-width%3A0%3B%22%20placeholder%3D%22Ask%20ClassGPT...%22%3E%27%2B%0A%20%20%20%20%20%20%20%20%27%3Cbutton%20id%3D%22cg-send%22%20style%3D%22padding%3A8px%2012px%3Bborder-radius%3A8px%3Bborder%3Anone%3Bbackground%3A%237c9eff%3Bcolor%3A%230f1015%3Bfont-weight%3A700%3Bcursor%3Apointer%3B%22%3EGo%3C/button%3E%27%2B%0A%20%20%20%20%20%20%27%3C/div%3E%27%2B%0A%20%20%20%20%27%3C/div%3E%27%2B%0A%20%20%20%20%27%3Cdiv%20id%3D%22cg-view-settings%22%20style%3D%22display%3Anone%3Bflex-direction%3Acolumn%3Bflex%3A1%3Bmin-height%3A0%3Boverflow-y%3Aauto%3Bpadding%3A14px%3Bfont-size%3A12.5px%3B%22%3E%3C/div%3E%27%3B%0A%0A%20%20document.body.appendChild%28box%29%3B%0A%0A%20%20document.getElementById%28%27cg-close%27%29.onclick%3Dfunction%28%29%7Bbox.remove%28%29%3B%7D%3B%0A%0A%20%20//%20dragging%0A%20%20var%20drag%3Dfalse%2Cox%3D0%2Coy%3D0%3B%0A%20%20var%20header%3Ddocument.getElementById%28%27cg-header%27%29%3B%0A%20%20header.onmousedown%3Dfunction%28e%29%7B%0A%20%20%20%20if%28e.target.id%3D%3D%3D%27cg-settings-btn%27%7C%7Ce.target.id%3D%3D%3D%27cg-close%27%29return%3B%0A%20%20%20%20drag%3Dtrue%3B%0A%20%20%20%20var%20r%3Dbox.getBoundingClientRect%28%29%3B%0A%20%20%20%20ox%3De.clientX-r.left%3Boy%3De.clientY-r.top%3B%0A%20%20%20%20box.style.right%3D%27auto%27%3Bbox.style.bottom%3D%27auto%27%3B%0A%20%20%20%20box.style.left%3Dr.left%2B%27px%27%3Bbox.style.top%3Dr.top%2B%27px%27%3B%0A%20%20%7D%3B%0A%20%20document.addEventListener%28%27mousemove%27%2Cfunction%28e%29%7B%0A%20%20%20%20if%28drag%29%7Bbox.style.left%3D%28e.clientX-ox%29%2B%27px%27%3Bbox.style.top%3D%28e.clientY-oy%29%2B%27px%27%3B%7D%0A%20%20%7D%29%3B%0A%20%20document.addEventListener%28%27mouseup%27%2Cfunction%28%29%7B%0A%20%20%20%20if%28drag%26%26settings.rememberPosition%29%7B%0A%20%20%20%20%20%20localStorage.setItem%28POSITION_KEY%2CJSON.stringify%28%7Bleft%3Abox.style.left%2Ctop%3Abox.style.top%7D%29%29%3B%0A%20%20%20%20%7D%0A%20%20%20%20drag%3Dfalse%3B%0A%20%20%7D%29%3B%0A%0A%20%20//%20keyboard%20shortcut%3A%20Ctrl%2BShift%2BG%20toggles%20visibility%0A%20%20function%20shortcutHandler%28e%29%7B%0A%20%20%20%20if%28%21settings.keyboardShortcut%29return%3B%0A%20%20%20%20if%28e.ctrlKey%26%26e.shiftKey%26%26%28e.key%3D%3D%3D%27G%27%7C%7Ce.key%3D%3D%3D%27g%27%29%29%7B%0A%20%20%20%20%20%20e.preventDefault%28%29%3B%0A%20%20%20%20%20%20box.style.display%20%3D%20box.style.display%3D%3D%3D%27none%27%20%3F%20%27flex%27%20%3A%20%27none%27%3B%0A%20%20%20%20%7D%0A%20%20%7D%0A%20%20document.addEventListener%28%27keydown%27%2CshortcutHandler%29%3B%0A%0A%20%20//%20---%20track%20last%20typable%20field%20outside%20widget%20---%0A%20%20var%20lastFocusedEl%3Dnull%3B%0A%20%20function%20isTypableField%28el%29%7B%0A%20%20%20%20if%28%21el%29return%20false%3B%0A%20%20%20%20if%28box.contains%28el%29%29return%20false%3B%0A%20%20%20%20var%20tag%3Del.tagName%3B%0A%20%20%20%20if%28tag%3D%3D%3D%27TEXTAREA%27%29return%20true%3B%0A%20%20%20%20if%28tag%3D%3D%3D%27INPUT%27%29%7B%0A%20%20%20%20%20%20var%20t%3D%28el.getAttribute%28%27type%27%29%7C%7C%27text%27%29.toLowerCase%28%29%3B%0A%20%20%20%20%20%20return%20%5B%27text%27%2C%27search%27%2C%27email%27%2C%27url%27%2C%27tel%27%5D.indexOf%28t%29%21%3D%3D-1%3B%0A%20%20%20%20%7D%0A%20%20%20%20if%28el.isContentEditable%29return%20true%3B%0A%20%20%20%20return%20false%3B%0A%20%20%7D%0A%20%20document.addEventListener%28%27focusin%27%2Cfunction%28e%29%7B%0A%20%20%20%20if%28isTypableField%28e.target%29%29lastFocusedEl%3De.target%3B%0A%20%20%7D%2Ctrue%29%3B%0A%0A%20%20function%20insertIntoField%28el%2Ctext%29%7B%0A%20%20%20%20if%28%21el%29return%20false%3B%0A%20%20%20%20if%28el.tagName%3D%3D%3D%27TEXTAREA%27%7C%7Cel.tagName%3D%3D%3D%27INPUT%27%29%7B%0A%20%20%20%20%20%20var%20start%3Del.selectionStart%3D%3Dnull%3Fel.value.length%3Ael.selectionStart%3B%0A%20%20%20%20%20%20var%20end%3Del.selectionEnd%3D%3Dnull%3Fel.value.length%3Ael.selectionEnd%3B%0A%20%20%20%20%20%20el.value%3Del.value.slice%280%2Cstart%29%2Btext%2Bel.value.slice%28end%29%3B%0A%20%20%20%20%20%20var%20pos%3Dstart%2Btext.length%3B%0A%20%20%20%20%20%20el.setSelectionRange%28pos%2Cpos%29%3B%0A%20%20%20%20%20%20el.dispatchEvent%28new%20Event%28%27input%27%2C%7Bbubbles%3Atrue%7D%29%29%3B%0A%20%20%20%20%20%20el.focus%28%29%3B%0A%20%20%20%20%20%20return%20true%3B%0A%20%20%20%20%7D%0A%20%20%20%20if%28el.isContentEditable%29%7B%0A%20%20%20%20%20%20el.focus%28%29%3B%0A%20%20%20%20%20%20var%20sel%3Dwindow.getSelection%28%29%3B%0A%20%20%20%20%20%20if%28sel%26%26sel.rangeCount%3E0%29%7B%0A%20%20%20%20%20%20%20%20var%20range%3Dsel.getRangeAt%280%29%3B%0A%20%20%20%20%20%20%20%20range.deleteContents%28%29%3B%0A%20%20%20%20%20%20%20%20range.insertNode%28document.createTextNode%28text%29%29%3B%0A%20%20%20%20%20%20%20%20range.collapse%28false%29%3B%0A%20%20%20%20%20%20%7Delse%7B%0A%20%20%20%20%20%20%20%20el.textContent%2B%3Dtext%3B%0A%20%20%20%20%20%20%7D%0A%20%20%20%20%20%20el.dispatchEvent%28new%20Event%28%27input%27%2C%7Bbubbles%3Atrue%7D%29%29%3B%0A%20%20%20%20%20%20return%20true%3B%0A%20%20%20%20%7D%0A%20%20%20%20return%20false%3B%0A%20%20%7D%0A%0A%20%20//%20---%20minimal%20markdown%20renderer%20%28bold%2C%20italics%2C%20inline%20code%2C%20code%20blocks%2C%20line%20breaks%29%20---%0A%20%20function%20escapeHtml%28s%29%7B%0A%20%20%20%20return%20s.replace%28/%26/g%2C%27%26amp%3B%27%29.replace%28/%3C/g%2C%27%26lt%3B%27%29.replace%28/%3E/g%2C%27%26gt%3B%27%29%3B%0A%20%20%7D%0A%20%20function%20renderMarkdown%28text%29%7B%0A%20%20%20%20var%20escaped%3DescapeHtml%28text%29%3B%0A%20%20%20%20escaped%3Descaped.replace%28/%60%60%60%28%5B%5Cs%5CS%5D%2A%3F%29%60%60%60/g%2Cfunction%28m%2Ccode%29%7B%0A%20%20%20%20%20%20return%20%27%3Cpre%20style%3D%22background%3A%230a0b0f%3Bborder%3A1px%20solid%20%232a2b33%3Bborder-radius%3A6px%3Bpadding%3A8px%3Boverflow-x%3Aauto%3Bmargin%3A6px%200%3B%22%3E%3Ccode%20style%3D%22font-family%3AJetBrains%20Mono%2Cmonospace%3Bfont-size%3A11.5px%3B%22%3E%27%2Bcode.trim%28%29%2B%27%3C/code%3E%3C/pre%3E%27%3B%0A%20%20%20%20%7D%29%3B%0A%20%20%20%20escaped%3Descaped.replace%28/%60%28%5B%5E%60%5D%2B%29%60/g%2C%27%3Ccode%20style%3D%22background%3A%230a0b0f%3Bpadding%3A1px%205px%3Bborder-radius%3A4px%3Bfont-family%3AJetBrains%20Mono%2Cmonospace%3Bfont-size%3A12px%3B%22%3E%241%3C/code%3E%27%29%3B%0A%20%20%20%20escaped%3Descaped.replace%28/%5C%2A%5C%2A%28%5B%5E%2A%5D%2B%29%5C%2A%5C%2A/g%2C%27%3Cstrong%3E%241%3C/strong%3E%27%29%3B%0A%20%20%20%20escaped%3Descaped.replace%28/%5C%2A%28%5B%5E%2A%5D%2B%29%5C%2A/g%2C%27%3Cem%3E%241%3C/em%3E%27%29%3B%0A%20%20%20%20escaped%3Descaped.replace%28/%5Cn/g%2C%27%3Cbr%3E%27%29%3B%0A%20%20%20%20return%20escaped%3B%0A%20%20%7D%0A%0A%20%20var%20hostname%3Dlocation.hostname%7C%7C%27page%27%3B%0A%20%20var%20historyKey%3DHISTORY_PREFIX%2Bhostname%3B%0A%20%20var%20systemPrompt%3D%27You%20are%20ClassGPT%2C%20a%20concise%2C%20helpful%20assistant%20embedded%20as%20a%20floating%20widget%20on%20a%20webpage.%20When%20the%20user%20has%20shared%20the%20page%20content%20with%20you%2C%20use%20it%20to%20answer%20questions%2C%20explain%20things%2C%20or%20summarize%20%E2%80%94%20but%20never%20just%20produce%20finished%20answers%20to%20graded%20assignments%2C%20quizzes%2C%20or%20homework%20problems%20on%20their%20behalf%3B%20instead%20help%20them%20understand%20the%20material.%20The%20user%20may%20draft%20messages%20%28replies%2C%20notes%2C%20snippets%29%20that%20they%20write%20themselves%20into%20a%20text%20field%20on%20the%20page%20using%20an%20insert%20button%20you%20provide%20%E2%80%94%20that%20is%20their%20own%20composed%20text%2C%20not%20you%20answering%20questions%20for%20them.%27%3B%0A%20%20var%20messages%3D%5B%7Brole%3A%27system%27%2Ccontent%3AsystemPrompt%7D%5D%3B%0A%0A%20%20var%20msgBox%3Ddocument.getElementById%28%27cg-messages%27%29%3B%0A%20%20var%20contextBar%3Ddocument.getElementById%28%27cg-context-bar%27%29%3B%0A%20%20var%20costBar%3Ddocument.getElementById%28%27cg-cost-bar%27%29%3B%0A%0A%20%20function%20renderMsgBody%28container%2Ctext%29%7B%0A%20%20%20%20if%28settings.markdown%29%7B%0A%20%20%20%20%20%20container.innerHTML%3DrenderMarkdown%28text%29%3B%0A%20%20%20%20%7Delse%7B%0A%20%20%20%20%20%20container.textContent%3Dtext%3B%0A%20%20%20%20%20%20container.style.whiteSpace%3D%27pre-wrap%27%3B%0A%20%20%20%20%7D%0A%20%20%7D%0A%0A%20%20function%20addMsg%28role%2Ctext%29%7B%0A%20%20%20%20var%20d%3Ddocument.createElement%28%27div%27%29%3B%0A%20%20%20%20d.style.margin%3D%270%200%2010px%200%27%3B%0A%20%20%20%20var%20who%3Ddocument.createElement%28%27div%27%29%3B%0A%20%20%20%20who.style.cssText%3D%27font-size%3A11px%3Bfont-weight%3A700%3Bopacity%3A.55%3Bmargin-bottom%3A2px%3Btext-transform%3Auppercase%3Bletter-spacing%3A.4px%3B%27%3B%0A%20%20%20%20who.textContent%3Drole%3D%3D%3D%27user%27%3F%27You%27%3A%27ClassGPT%27%3B%0A%20%20%20%20var%20body%3Ddocument.createElement%28%27div%27%29%3B%0A%20%20%20%20renderMsgBody%28body%2Ctext%29%3B%0A%20%20%20%20d.appendChild%28who%29%3Bd.appendChild%28body%29%3B%0A%0A%20%20%20%20if%28role%3D%3D%3D%27assistant%27%29%7B%0A%20%20%20%20%20%20var%20actions%3Ddocument.createElement%28%27div%27%29%3B%0A%20%20%20%20%20%20actions.style.cssText%3D%27display%3Aflex%3Bgap%3A8px%3Bmargin-top%3A6px%3Bflex-wrap%3Awrap%3B%27%3B%0A%20%20%20%20%20%20var%20copyBtn%3Ddocument.createElement%28%27button%27%29%3B%0A%20%20%20%20%20%20copyBtn.textContent%3D%27copy%27%3B%0A%20%20%20%20%20%20copyBtn.style.cssText%3D%27font-size%3A11px%3Bpadding%3A4px%208px%3Bborder-radius%3A6px%3Bborder%3A1px%20solid%20%232a2b33%3Bbackground%3A%23191a21%3Bcolor%3A%238a8b96%3Bcursor%3Apointer%3B%27%3B%0A%20%20%20%20%20%20copyBtn.onclick%3Dfunction%28%29%7B%0A%20%20%20%20%20%20%20%20navigator.clipboard.writeText%28text%29.then%28function%28%29%7B%0A%20%20%20%20%20%20%20%20%20%20copyBtn.textContent%3D%27copied%27%3B%0A%20%20%20%20%20%20%20%20%20%20setTimeout%28function%28%29%7BcopyBtn.textContent%3D%27copy%27%3B%7D%2C1200%29%3B%0A%20%20%20%20%20%20%20%20%7D%29%3B%0A%20%20%20%20%20%20%7D%3B%0A%20%20%20%20%20%20actions.appendChild%28copyBtn%29%3B%0A%20%20%20%20%20%20if%28settings.allowInsert%29%7B%0A%20%20%20%20%20%20%20%20var%20insertBtn%3Ddocument.createElement%28%27button%27%29%3B%0A%20%20%20%20%20%20%20%20insertBtn.textContent%3D%27insert%20into%20page%27%3B%0A%20%20%20%20%20%20%20%20insertBtn.style.cssText%3D%27font-size%3A11px%3Bpadding%3A4px%208px%3Bborder-radius%3A6px%3Bborder%3A1px%20solid%20%232a2b33%3Bbackground%3A%23191a21%3Bcolor%3A%238a8b96%3Bcursor%3Apointer%3B%27%3B%0A%20%20%20%20%20%20%20%20insertBtn.onclick%3Dfunction%28%29%7B%0A%20%20%20%20%20%20%20%20%20%20if%28%21lastFocusedEl%29%7B%0A%20%20%20%20%20%20%20%20%20%20%20%20insertBtn.textContent%3D%27click%20a%20text%20box%20on%20the%20page%20first%27%3B%0A%20%20%20%20%20%20%20%20%20%20%20%20setTimeout%28function%28%29%7BinsertBtn.textContent%3D%27insert%20into%20page%27%3B%7D%2C1800%29%3B%0A%20%20%20%20%20%20%20%20%20%20%20%20return%3B%0A%20%20%20%20%20%20%20%20%20%20%7D%0A%20%20%20%20%20%20%20%20%20%20var%20ok%3DinsertIntoField%28lastFocusedEl%2Ctext%29%3B%0A%20%20%20%20%20%20%20%20%20%20insertBtn.textContent%3Dok%3F%27inserted%27%3A%27failed%27%3B%0A%20%20%20%20%20%20%20%20%20%20setTimeout%28function%28%29%7BinsertBtn.textContent%3D%27insert%20into%20page%27%3B%7D%2C1200%29%3B%0A%20%20%20%20%20%20%20%20%7D%3B%0A%20%20%20%20%20%20%20%20actions.appendChild%28insertBtn%29%3B%0A%20%20%20%20%20%20%7D%0A%20%20%20%20%20%20d.appendChild%28actions%29%3B%0A%20%20%20%20%7D%0A%0A%20%20%20%20msgBox.appendChild%28d%29%3B%0A%20%20%20%20msgBox.scrollTop%3DmsgBox.scrollHeight%3B%0A%20%20%20%20return%20body%3B%0A%20%20%7D%0A%0A%20%20//%20load%20history%20if%20enabled%0A%20%20if%28settings.rememberHistory%29%7B%0A%20%20%20%20try%7B%0A%20%20%20%20%20%20var%20savedHist%3DJSON.parse%28localStorage.getItem%28historyKey%29%7C%7C%27null%27%29%3B%0A%20%20%20%20%20%20if%28savedHist%26%26savedHist.length%29%7B%0A%20%20%20%20%20%20%20%20savedHist.forEach%28function%28m%29%7B%0A%20%20%20%20%20%20%20%20%20%20messages.push%28m%29%3B%0A%20%20%20%20%20%20%20%20%20%20addMsg%28m.role%2Cm.content%29%3B%0A%20%20%20%20%20%20%20%20%7D%29%3B%0A%20%20%20%20%20%20%7D%0A%20%20%20%20%7Dcatch%28e%29%7B%7D%0A%20%20%7D%0A%0A%20%20function%20persistHistory%28%29%7B%0A%20%20%20%20if%28%21settings.rememberHistory%29return%3B%0A%20%20%20%20var%20toSave%3Dmessages.filter%28function%28m%29%7Breturn%20m.role%21%3D%3D%27system%27%3B%7D%29.slice%28-40%29%3B%0A%20%20%20%20localStorage.setItem%28historyKey%2CJSON.stringify%28toSave%29%29%3B%0A%20%20%7D%0A%0A%20%20function%20extractPageText%28%29%7B%0A%20%20%20%20var%20clone%3Ddocument.body.cloneNode%28true%29%3B%0A%20%20%20%20var%20kill%3Dclone.querySelectorAll%28%27%23classgpt-widget%2Cscript%2Cstyle%2Cnoscript%2Csvg%2Ciframe%27%29%3B%0A%20%20%20%20kill.forEach%28function%28el%29%7Bel.remove%28%29%3B%7D%29%3B%0A%20%20%20%20var%20text%3Dclone.innerText%7C%7Cclone.textContent%7C%7C%27%27%3B%0A%20%20%20%20text%3Dtext.replace%28/%5Cn%7B3%2C%7D/g%2C%27%5Cn%5Cn%27%29.replace%28/%5B%20%5Ct%5D%7B2%2C%7D/g%2C%27%20%27%29.trim%28%29%3B%0A%20%20%20%20var%20MAXLEN%3D12000%3B%0A%20%20%20%20if%28text.length%3EMAXLEN%29%7Btext%3Dtext.slice%280%2CMAXLEN%29%2B%27%5Cn%5Cn%5B...page%20truncated...%5D%27%3B%7D%0A%20%20%20%20return%20text%3B%0A%20%20%7D%0A%0A%20%20document.getElementById%28%27cg-readpage%27%29.onclick%3Dfunction%28%29%7B%0A%20%20%20%20var%20text%3DextractPageText%28%29%3B%0A%20%20%20%20if%28%21text%29%7BaddMsg%28%27assistant%27%2C%22Couldn%27t%20find%20readable%20text%20on%20this%20page.%22%29%3Breturn%3B%7D%0A%20%20%20%20pageContext%3Dtext%3B%0A%20%20%20%20contextBar.style.display%3D%27flex%27%3B%0A%20%20%20%20contextBar.innerHTML%3D%27%3Cspan%3E%26%23128196%3B%20page%20loaded%20%28%27%2Btext.length%2B%27%20chars%29%3C/span%3E%3Cspan%20id%3D%22cg-clear-ctx%22%20style%3D%22cursor%3Apointer%3Bcolor%3A%237c9eff%3B%22%3Eclear%3C/span%3E%27%3B%0A%20%20%20%20document.getElementById%28%27cg-clear-ctx%27%29.onclick%3Dfunction%28%29%7B%0A%20%20%20%20%20%20pageContext%3Dnull%3B%0A%20%20%20%20%20%20contextBar.style.display%3D%27none%27%3B%0A%20%20%20%20%7D%3B%0A%20%20%20%20addMsg%28%27assistant%27%2C%27Got%20the%20page%20%E2%80%94%20ask%20me%20anything%20about%20it%20%28summarize%20it%2C%20explain%20a%20part%2C%20define%20a%20term%2C%20etc%29.%27%29%3B%0A%20%20%7D%3B%0A%0A%20%20//%20voice%20input%0A%20%20var%20recognizing%3Dfalse%3B%0A%20%20var%20SpeechRec%3Dwindow.SpeechRecognition%7C%7Cwindow.webkitSpeechRecognition%3B%0A%20%20var%20micBtn%3Ddocument.getElementById%28%27cg-mic%27%29%3B%0A%20%20if%28%21settings.voiceInput%7C%7C%21SpeechRec%29%7B%0A%20%20%20%20micBtn.style.display%3D%27none%27%3B%0A%20%20%7Delse%7B%0A%20%20%20%20var%20recognition%3Dnew%20SpeechRec%28%29%3B%0A%20%20%20%20recognition.continuous%3Dfalse%3B%0A%20%20%20%20recognition.interimResults%3Dfalse%3B%0A%20%20%20%20recognition.onresult%3Dfunction%28e%29%7B%0A%20%20%20%20%20%20var%20transcript%3De.results%5B0%5D%5B0%5D.transcript%3B%0A%20%20%20%20%20%20var%20input%3Ddocument.getElementById%28%27cg-input%27%29%3B%0A%20%20%20%20%20%20input.value%3D%28input.value%3Finput.value%2B%27%20%27%3A%27%27%29%2Btranscript%3B%0A%20%20%20%20%7D%3B%0A%20%20%20%20recognition.onend%3Dfunction%28%29%7Brecognizing%3Dfalse%3BmicBtn.style.opacity%3D%27.7%27%3B%7D%3B%0A%20%20%20%20micBtn.onclick%3Dfunction%28%29%7B%0A%20%20%20%20%20%20if%28recognizing%29return%3B%0A%20%20%20%20%20%20recognizing%3Dtrue%3B%0A%20%20%20%20%20%20micBtn.style.opacity%3D%271%27%3B%0A%20%20%20%20%20%20try%7Brecognition.start%28%29%3B%7Dcatch%28e%29%7Brecognizing%3Dfalse%3B%7D%0A%20%20%20%20%7D%3B%0A%20%20%7D%0A%0A%20%20//%20rough%20cost%20estimate%20%28very%20approximate%2C%20%24%20per%201M%20input%20tokens%2C%20heuristic%204%20chars/token%29%0A%20%20function%20estimateCost%28%29%7B%0A%20%20%20%20var%20preset%3DMODEL_PRESETS.find%28function%28p%29%7Breturn%20p.id%3D%3D%3Dsettings.model%3B%7D%29%3B%0A%20%20%20%20if%28%21preset%7C%7Cpreset.price%3D%3Dnull%29%7BcostBar.style.display%3D%27none%27%3Breturn%3B%7D%0A%20%20%20%20var%20totalChars%3Dmessages.reduce%28function%28a%2Cm%29%7Breturn%20a%2B%28m.content%3Fm.content.length%3A0%29%3B%7D%2C0%29%3B%0A%20%20%20%20var%20tokens%3DMath.round%28totalChars/4%29%3B%0A%20%20%20%20var%20cost%3D%28tokens/1000000%29%2Apreset.price%3B%0A%20%20%20%20costBar.style.display%3D%27block%27%3B%0A%20%20%20%20costBar.textContent%3D%27~%27%2Btokens%2B%27%20tokens%20this%20session%20%C2%B7%20~%24%27%2Bcost.toFixed%284%29%2B%27%20est.%27%3B%0A%20%20%7D%0A%0A%20%20async%20function%20send%28%29%7B%0A%20%20%20%20var%20input%3Ddocument.getElementById%28%27cg-input%27%29%3B%0A%20%20%20%20var%20text%3Dinput.value.trim%28%29%3B%0A%20%20%20%20if%28%21text%29return%3B%0A%20%20%20%20input.value%3D%27%27%3B%0A%20%20%20%20addMsg%28%27user%27%2Ctext%29%3B%0A%0A%20%20%20%20var%20outgoing%3Dmessages.slice%28%29%3B%0A%20%20%20%20if%28pageContext%29%7B%0A%20%20%20%20%20%20outgoing.push%28%7Brole%3A%27system%27%2Ccontent%3A%27Content%20of%20the%20current%20webpage%20%28title%3A%20%27%2Bdocument.title%2B%27%2C%20url%3A%20%27%2Blocation.href%2B%27%29%3A%5Cn%5Cn%27%2BpageContext%7D%29%3B%0A%20%20%20%20%7D%0A%20%20%20%20messages.push%28%7Brole%3A%27user%27%2Ccontent%3Atext%7D%29%3B%0A%20%20%20%20outgoing.push%28%7Brole%3A%27user%27%2Ccontent%3Atext%7D%29%3B%0A%20%20%20%20persistHistory%28%29%3B%0A%20%20%20%20if%28settings.showCost%29estimateCost%28%29%3B%0A%0A%20%20%20%20var%20thinking%3DaddMsg%28%27assistant%27%2C%27...%27%29%3B%0A%20%20%20%20try%7B%0A%20%20%20%20%20%20var%20res%3Dawait%20fetch%28%27https%3A//openrouter.ai/api/v1/chat/completions%27%2C%7B%0A%20%20%20%20%20%20%20%20method%3A%27POST%27%2C%0A%20%20%20%20%20%20%20%20headers%3A%7B%0A%20%20%20%20%20%20%20%20%20%20%27Content-Type%27%3A%27application/json%27%2C%0A%20%20%20%20%20%20%20%20%20%20%27Authorization%27%3A%27Bearer%20%27%2BapiKey%2C%0A%20%20%20%20%20%20%20%20%20%20%27HTTP-Referer%27%3Alocation.href%2C%0A%20%20%20%20%20%20%20%20%20%20%27X-Title%27%3A%27ClassGPT%27%0A%20%20%20%20%20%20%20%20%7D%2C%0A%20%20%20%20%20%20%20%20body%3AJSON.stringify%28%7Bmodel%3AactiveModel%28%29%2Cmessages%3Aoutgoing%7D%29%0A%20%20%20%20%20%20%7D%29%3B%0A%20%20%20%20%20%20var%20data%3Dawait%20res.json%28%29%3B%0A%20%20%20%20%20%20if%28data.error%29%7B%0A%20%20%20%20%20%20%20%20renderMsgBody%28thinking%2C%27Error%3A%20%27%2Bdata.error.message%29%3B%0A%20%20%20%20%20%20%20%20return%3B%0A%20%20%20%20%20%20%7D%0A%20%20%20%20%20%20var%20reply%3D%28data.choices%26%26data.choices%5B0%5D%26%26data.choices%5B0%5D.message%26%26data.choices%5B0%5D.message.content%29%7C%7C%27No%20response.%27%3B%0A%20%20%20%20%20%20renderMsgBody%28thinking%2Creply%29%3B%0A%20%20%20%20%20%20messages.push%28%7Brole%3A%27assistant%27%2Ccontent%3Areply%7D%29%3B%0A%20%20%20%20%20%20persistHistory%28%29%3B%0A%20%20%20%20%20%20if%28settings.showCost%29estimateCost%28%29%3B%0A%20%20%20%20%7Dcatch%28e%29%7B%0A%20%20%20%20%20%20renderMsgBody%28thinking%2C%27Error%3A%20%27%2Be.message%29%3B%0A%20%20%20%20%7D%0A%20%20%7D%0A%20%20document.getElementById%28%27cg-send%27%29.onclick%3Dsend%3B%0A%20%20document.getElementById%28%27cg-input%27%29.addEventListener%28%27keydown%27%2Cfunction%28e%29%7B%0A%20%20%20%20if%28e.key%3D%3D%3D%27Enter%27%29send%28%29%3B%0A%20%20%7D%29%3B%0A%0A%20%20//%20%3D%3D%3D%3D%3D%20settings%20panel%20%3D%3D%3D%3D%3D%0A%20%20var%20chatView%3Ddocument.getElementById%28%27cg-view-chat%27%29%3B%0A%20%20var%20settingsView%3Ddocument.getElementById%28%27cg-view-settings%27%29%3B%0A%0A%20%20function%20fieldRow%28labelText%2CinputEl%29%7B%0A%20%20%20%20var%20row%3Ddocument.createElement%28%27div%27%29%3B%0A%20%20%20%20row.style.cssText%3D%27margin-bottom%3A14px%3B%27%3B%0A%20%20%20%20var%20label%3Ddocument.createElement%28%27div%27%29%3B%0A%20%20%20%20label.textContent%3DlabelText%3B%0A%20%20%20%20label.style.cssText%3D%27font-size%3A11px%3Bcolor%3A%238a8b96%3Bmargin-bottom%3A5px%3Btext-transform%3Auppercase%3Bletter-spacing%3A.3px%3B%27%3B%0A%20%20%20%20row.appendChild%28label%29%3B%0A%20%20%20%20row.appendChild%28inputEl%29%3B%0A%20%20%20%20return%20row%3B%0A%20%20%7D%0A%20%20function%20toggleRow%28labelText%2Ckey%29%7B%0A%20%20%20%20var%20row%3Ddocument.createElement%28%27label%27%29%3B%0A%20%20%20%20row.style.cssText%3D%27display%3Aflex%3Balign-items%3Acenter%3Bjustify-content%3Aspace-between%3Bpadding%3A9px%200%3Bborder-bottom%3A1px%20solid%20%2322232b%3Bcursor%3Apointer%3Bfont-size%3A12.5px%3B%27%3B%0A%20%20%20%20var%20span%3Ddocument.createElement%28%27span%27%29%3B%0A%20%20%20%20span.textContent%3DlabelText%3B%0A%20%20%20%20var%20cb%3Ddocument.createElement%28%27input%27%29%3B%0A%20%20%20%20cb.type%3D%27checkbox%27%3B%0A%20%20%20%20cb.checked%3D%21%21settings%5Bkey%5D%3B%0A%20%20%20%20cb.style.cssText%3D%27width%3A16px%3Bheight%3A16px%3Baccent-color%3A%237c9eff%3Bcursor%3Apointer%3B%27%3B%0A%20%20%20%20cb.onchange%3Dfunction%28%29%7B%0A%20%20%20%20%20%20settings%5Bkey%5D%3Dcb.checked%3B%0A%20%20%20%20%20%20saveSettings%28settings%29%3B%0A%20%20%20%20%20%20applySettingsSideEffects%28%29%3B%0A%20%20%20%20%7D%3B%0A%20%20%20%20row.appendChild%28span%29%3Brow.appendChild%28cb%29%3B%0A%20%20%20%20return%20row%3B%0A%20%20%7D%0A%0A%20%20function%20applySettingsSideEffects%28%29%7B%0A%20%20%20%20compact%3Dsettings.compact%3B%0A%20%20%20%20applySize%28%29%3B%0A%20%20%20%20if%28%21settings.voiceInput%7C%7C%21SpeechRec%29%7BmicBtn.style.display%3D%27none%27%3B%7Delse%7BmicBtn.style.display%3D%27inline-block%27%3B%7D%0A%20%20%20%20if%28%21settings.showCost%29%7BcostBar.style.display%3D%27none%27%3B%7D%0A%20%20%7D%0A%0A%20%20function%20buildSettingsView%28%29%7B%0A%20%20%20%20settingsView.innerHTML%3D%27%27%3B%0A%0A%20%20%20%20var%20backBtn%3Ddocument.createElement%28%27button%27%29%3B%0A%20%20%20%20backBtn.textContent%3D%27%E2%86%90%20back%20to%20chat%27%3B%0A%20%20%20%20backBtn.style.cssText%3D%27background%3Anone%3Bborder%3Anone%3Bcolor%3A%237c9eff%3Bfont-size%3A12.5px%3Bcursor%3Apointer%3Bpadding%3A0%200%2014px%3Btext-align%3Aleft%3B%27%3B%0A%20%20%20%20backBtn.onclick%3Dfunction%28%29%7B%0A%20%20%20%20%20%20settingsView.style.display%3D%27none%27%3B%0A%20%20%20%20%20%20chatView.style.display%3D%27flex%27%3B%0A%20%20%20%20%7D%3B%0A%20%20%20%20settingsView.appendChild%28backBtn%29%3B%0A%0A%20%20%20%20//%20API%20key%0A%20%20%20%20var%20keyInput%3Ddocument.createElement%28%27input%27%29%3B%0A%20%20%20%20keyInput.type%3D%27password%27%3B%0A%20%20%20%20keyInput.value%3DapiKey%7C%7C%27%27%3B%0A%20%20%20%20keyInput.style.cssText%3D%27width%3A100%25%3Bpadding%3A8px%3Bborder-radius%3A6px%3Bborder%3A1px%20solid%20%232a2b33%3Bbackground%3A%230a0b0f%3Bcolor%3A%23e9e9ef%3Bfont-family%3Amonospace%3Bfont-size%3A11.5px%3B%27%3B%0A%20%20%20%20keyInput.onchange%3Dfunction%28%29%7B%0A%20%20%20%20%20%20apiKey%3DkeyInput.value.trim%28%29%3B%0A%20%20%20%20%20%20localStorage.setItem%28%27classgpt_api_key%27%2CapiKey%29%3B%0A%20%20%20%20%7D%3B%0A%20%20%20%20settingsView.appendChild%28fieldRow%28%27OpenRouter%20API%20key%27%2CkeyInput%29%29%3B%0A%0A%20%20%20%20//%20model%20dropdown%0A%20%20%20%20var%20modelSelect%3Ddocument.createElement%28%27select%27%29%3B%0A%20%20%20%20modelSelect.style.cssText%3D%27width%3A100%25%3Bpadding%3A8px%3Bborder-radius%3A6px%3Bborder%3A1px%20solid%20%232a2b33%3Bbackground%3A%230a0b0f%3Bcolor%3A%23e9e9ef%3Bfont-size%3A12.5px%3B%27%3B%0A%20%20%20%20MODEL_PRESETS.forEach%28function%28p%29%7B%0A%20%20%20%20%20%20var%20opt%3Ddocument.createElement%28%27option%27%29%3B%0A%20%20%20%20%20%20opt.value%3Dp.id%3Bopt.textContent%3Dp.label%3B%0A%20%20%20%20%20%20if%28p.id%3D%3D%3Dsettings.model%29opt.selected%3Dtrue%3B%0A%20%20%20%20%20%20modelSelect.appendChild%28opt%29%3B%0A%20%20%20%20%7D%29%3B%0A%20%20%20%20var%20customWrap%3Ddocument.createElement%28%27div%27%29%3B%0A%20%20%20%20customWrap.style.cssText%3D%27margin-top%3A8px%3B%27%2B%28settings.model%3D%3D%3D%27custom%27%3F%27%27%3A%27display%3Anone%3B%27%29%3B%0A%20%20%20%20var%20customInput%3Ddocument.createElement%28%27input%27%29%3B%0A%20%20%20%20customInput.placeholder%3D%27provider/model-id%27%3B%0A%20%20%20%20customInput.value%3Dsettings.customModel%7C%7C%27%27%3B%0A%20%20%20%20customInput.style.cssText%3D%27width%3A100%25%3Bpadding%3A8px%3Bborder-radius%3A6px%3Bborder%3A1px%20solid%20%232a2b33%3Bbackground%3A%230a0b0f%3Bcolor%3A%23e9e9ef%3Bfont-family%3Amonospace%3Bfont-size%3A11.5px%3B%27%3B%0A%20%20%20%20customInput.onchange%3Dfunction%28%29%7B%0A%20%20%20%20%20%20settings.customModel%3DcustomInput.value.trim%28%29%3B%0A%20%20%20%20%20%20saveSettings%28settings%29%3B%0A%20%20%20%20%7D%3B%0A%20%20%20%20customWrap.appendChild%28customInput%29%3B%0A%20%20%20%20modelSelect.onchange%3Dfunction%28%29%7B%0A%20%20%20%20%20%20settings.model%3DmodelSelect.value%3B%0A%20%20%20%20%20%20saveSettings%28settings%29%3B%0A%20%20%20%20%20%20customWrap.style.display%3Dsettings.model%3D%3D%3D%27custom%27%3F%27block%27%3A%27none%27%3B%0A%20%20%20%20%7D%3B%0A%20%20%20%20var%20modelWrap%3Ddocument.createElement%28%27div%27%29%3B%0A%20%20%20%20modelWrap.appendChild%28modelSelect%29%3B%0A%20%20%20%20modelWrap.appendChild%28customWrap%29%3B%0A%20%20%20%20settingsView.appendChild%28fieldRow%28%27Model%27%2CmodelWrap%29%29%3B%0A%0A%20%20%20%20//%20feature%20toggles%0A%20%20%20%20var%20togglesHeader%3Ddocument.createElement%28%27div%27%29%3B%0A%20%20%20%20togglesHeader.textContent%3D%27Features%27%3B%0A%20%20%20%20togglesHeader.style.cssText%3D%27font-size%3A11px%3Bcolor%3A%238a8b96%3Bmargin%3A16px%200%204px%3Btext-transform%3Auppercase%3Bletter-spacing%3A.3px%3B%27%3B%0A%20%20%20%20settingsView.appendChild%28togglesHeader%29%3B%0A%0A%20%20%20%20settingsView.appendChild%28toggleRow%28%27Markdown%20rendering%27%2C%27markdown%27%29%29%3B%0A%20%20%20%20settingsView.appendChild%28toggleRow%28%27Remember%20chat%20on%20this%20site%27%2C%27rememberHistory%27%29%29%3B%0A%20%20%20%20settingsView.appendChild%28toggleRow%28%27Remember%20widget%20position%27%2C%27rememberPosition%27%29%29%3B%0A%20%20%20%20settingsView.appendChild%28toggleRow%28%27Show%20token/cost%20estimate%27%2C%27showCost%27%29%29%3B%0A%20%20%20%20settingsView.appendChild%28toggleRow%28%27Allow%20%22insert%20into%20page%22%27%2C%27allowInsert%27%29%29%3B%0A%20%20%20%20settingsView.appendChild%28toggleRow%28%27Compact%20size%27%2C%27compact%27%29%29%3B%0A%20%20%20%20settingsView.appendChild%28toggleRow%28%27Voice%20input%20%28mic%20button%29%27%2C%27voiceInput%27%29%29%3B%0A%20%20%20%20settingsView.appendChild%28toggleRow%28%27Ctrl%2BShift%2BG%20to%20show/hide%27%2C%27keyboardShortcut%27%29%29%3B%0A%0A%20%20%20%20//%20export%0A%20%20%20%20var%20exportBtn%3Ddocument.createElement%28%27button%27%29%3B%0A%20%20%20%20exportBtn.textContent%3D%27Export%20this%20chat%20%28.txt%29%27%3B%0A%20%20%20%20exportBtn.style.cssText%3D%27width%3A100%25%3Bmargin-top%3A16px%3Bpadding%3A9px%3Bborder-radius%3A8px%3Bborder%3A1px%20solid%20%232a2b33%3Bbackground%3A%23191a21%3Bcolor%3A%23e9e9ef%3Bcursor%3Apointer%3Bfont-size%3A12px%3B%27%3B%0A%20%20%20%20exportBtn.onclick%3Dfunction%28%29%7B%0A%20%20%20%20%20%20var%20lines%3Dmessages.filter%28function%28m%29%7Breturn%20m.role%21%3D%3D%27system%27%3B%7D%29.map%28function%28m%29%7B%0A%20%20%20%20%20%20%20%20return%20%28m.role%3D%3D%3D%27user%27%3F%27You%3A%20%27%3A%27ClassGPT%3A%20%27%29%2Bm.content%3B%0A%20%20%20%20%20%20%7D%29%3B%0A%20%20%20%20%20%20var%20blob%3Dnew%20Blob%28%5Blines.join%28%27%5Cn%5Cn%27%29%5D%2C%7Btype%3A%27text/plain%27%7D%29%3B%0A%20%20%20%20%20%20var%20a%3Ddocument.createElement%28%27a%27%29%3B%0A%20%20%20%20%20%20a.href%3DURL.createObjectURL%28blob%29%3B%0A%20%20%20%20%20%20a.download%3D%27classgpt-chat.txt%27%3B%0A%20%20%20%20%20%20a.click%28%29%3B%0A%20%20%20%20%7D%3B%0A%20%20%20%20settingsView.appendChild%28exportBtn%29%3B%0A%0A%20%20%20%20var%20clearHistBtn%3Ddocument.createElement%28%27button%27%29%3B%0A%20%20%20%20clearHistBtn.textContent%3D%27Clear%20saved%20history%20for%20this%20site%27%3B%0A%20%20%20%20clearHistBtn.style.cssText%3D%27width%3A100%25%3Bmargin-top%3A8px%3Bpadding%3A9px%3Bborder-radius%3A8px%3Bborder%3A1px%20solid%20%232a2b33%3Bbackground%3A%23191a21%3Bcolor%3A%238a8b96%3Bcursor%3Apointer%3Bfont-size%3A12px%3B%27%3B%0A%20%20%20%20clearHistBtn.onclick%3Dfunction%28%29%7B%0A%20%20%20%20%20%20localStorage.removeItem%28historyKey%29%3B%0A%20%20%20%20%20%20clearHistBtn.textContent%3D%27cleared%27%3B%0A%20%20%20%20%20%20setTimeout%28function%28%29%7BclearHistBtn.textContent%3D%27Clear%20saved%20history%20for%20this%20site%27%3B%7D%2C1200%29%3B%0A%20%20%20%20%7D%3B%0A%20%20%20%20settingsView.appendChild%28clearHistBtn%29%3B%0A%20%20%7D%0A%0A%20%20document.getElementById%28%27cg-settings-btn%27%29.onclick%3Dfunction%28%29%7B%0A%20%20%20%20buildSettingsView%28%29%3B%0A%20%20%20%20chatView.style.display%3D%27none%27%3B%0A%20%20%20%20settingsView.style.display%3D%27flex%27%3B%0A%20%20%7D%3B%0A%0A%20%20applySettingsSideEffects%28%29%3B%0A%20%20document.getElementById%28%27cg-input%27%29.focus%28%29%3B%0A%7D%29%28%29%3B%0A</code>
+    </div>
+  </div>
+
+  <p class="note">A key baked into the bookmark link is stored in plain text inside your browser's bookmarks — fine on a personal device, but don't share the link or sync it somewhere untrusted. It's sent straight from your browser to OpenRouter and never passes through us.</p>
+  <p class="note warn">Reading a page and inserting text are there to help you understand material and drop in your own drafted wording faster — not to auto-answer graded quizzes or assignments. It's built and prompted with that boundary in mind, and it won't act on a page without you clicking the buttons yourself.</p>
+</div>
+
+<script>
+var WIDGET_B64 = "KGZ1bmN0aW9uKCl7CiAgdmFyIEVYSVNUSU5HPWRvY3VtZW50LmdldEVsZW1lbnRCeUlkKCdjbGFzc2dwdC13aWRnZXQnKTsKICBpZihFWElTVElORyl7CiAgICBFWElTVElORy5zdHlsZS5kaXNwbGF5ID0gRVhJU1RJTkcuc3R5bGUuZGlzcGxheT09PSdub25lJyA/ICdmbGV4JyA6ICdub25lJzsKICAgIHJldHVybjsKICB9CgogIHZhciBTRVRUSU5HU19LRVk9J2NsYXNzZ3B0X3NldHRpbmdzJzsKICB2YXIgSElTVE9SWV9QUkVGSVg9J2NsYXNzZ3B0X2hpc3RvcnlfJzsKICB2YXIgUE9TSVRJT05fS0VZPSdjbGFzc2dwdF9wb3NpdGlvbic7CiAgdmFyIEJBS0VEX0tFWT0nX19BUElfS0VZX18nOwoKICB2YXIgTU9ERUxfUFJFU0VUUz1bCiAgICB7aWQ6J29wZW5haS9ncHQtNG8tbWluaScsbGFiZWw6J0dQVC00byBtaW5pIChkZWZhdWx0KScscHJpY2U6MC4xNX0sCiAgICB7aWQ6J29wZW5haS9ncHQtNG8nLGxhYmVsOidHUFQtNG8nLHByaWNlOjIuNX0sCiAgICB7aWQ6J2FudGhyb3BpYy9jbGF1ZGUtMy41LWhhaWt1JyxsYWJlbDonQ2xhdWRlIDMuNSBIYWlrdScscHJpY2U6MC44fSwKICAgIHtpZDonYW50aHJvcGljL2NsYXVkZS0zLjUtc29ubmV0JyxsYWJlbDonQ2xhdWRlIDMuNSBTb25uZXQnLHByaWNlOjN9LAogICAge2lkOidnb29nbGUvZ2VtaW5pLTIuMC1mbGFzaC0wMDEnLGxhYmVsOidHZW1pbmkgMi4wIEZsYXNoJyxwcmljZTowLjF9LAogICAge2lkOidjdXN0b20nLGxhYmVsOidDdXN0b20gbW9kZWwgaWQuLi4nLHByaWNlOm51bGx9CiAgXTsKCiAgdmFyIERFRkFVTFRfU0VUVElOR1M9ewogICAgbW9kZWw6J29wZW5haS9ncHQtNG8tbWluaScsCiAgICBjdXN0b21Nb2RlbDonJywKICAgIG1hcmtkb3duOnRydWUsCiAgICByZW1lbWJlckhpc3Rvcnk6ZmFsc2UsCiAgICByZW1lbWJlclBvc2l0aW9uOmZhbHNlLAogICAgc2hvd0Nvc3Q6dHJ1ZSwKICAgIGFsbG93SW5zZXJ0OnRydWUsCiAgICBjb21wYWN0OmZhbHNlLAogICAgdm9pY2VJbnB1dDp0cnVlLAogICAga2V5Ym9hcmRTaG9ydGN1dDp0cnVlCiAgfTsKCiAgZnVuY3Rpb24gbG9hZFNldHRpbmdzKCl7CiAgICB0cnl7CiAgICAgIHZhciByYXc9bG9jYWxTdG9yYWdlLmdldEl0ZW0oU0VUVElOR1NfS0VZKTsKICAgICAgaWYoIXJhdylyZXR1cm4gT2JqZWN0LmFzc2lnbih7fSxERUZBVUxUX1NFVFRJTkdTKTsKICAgICAgdmFyIHBhcnNlZD1KU09OLnBhcnNlKHJhdyk7CiAgICAgIHJldHVybiBPYmplY3QuYXNzaWduKHt9LERFRkFVTFRfU0VUVElOR1MscGFyc2VkKTsKICAgIH1jYXRjaChlKXtyZXR1cm4gT2JqZWN0LmFzc2lnbih7fSxERUZBVUxUX1NFVFRJTkdTKTt9CiAgfQogIGZ1bmN0aW9uIHNhdmVTZXR0aW5ncyhzKXsKICAgIGxvY2FsU3RvcmFnZS5zZXRJdGVtKFNFVFRJTkdTX0tFWSxKU09OLnN0cmluZ2lmeShzKSk7CiAgfQoKICB2YXIgc2V0dGluZ3M9bG9hZFNldHRpbmdzKCk7CiAgdmFyIGFwaUtleT0oQkFLRURfS0VZJiZCQUtFRF9LRVkuaW5kZXhPZignQVBJX0tFWScpPT09LTEpP0JBS0VEX0tFWTpsb2NhbFN0b3JhZ2UuZ2V0SXRlbSgnY2xhc3NncHRfYXBpX2tleScpOwogIGlmKCFhcGlLZXkpewogICAgYXBpS2V5PXByb21wdCgnUGFzdGUgeW91ciBPcGVuUm91dGVyIEFQSSBrZXkgKGdldCBvbmUgZnJlZSBhdCBvcGVucm91dGVyLmFpL2tleXMpOicpOwogICAgaWYoIWFwaUtleSlyZXR1cm47CiAgICBsb2NhbFN0b3JhZ2Uuc2V0SXRlbSgnY2xhc3NncHRfYXBpX2tleScsYXBpS2V5KTsKICB9ZWxzZSBpZighbG9jYWxTdG9yYWdlLmdldEl0ZW0oJ2NsYXNzZ3B0X2FwaV9rZXknKSl7CiAgICBsb2NhbFN0b3JhZ2Uuc2V0SXRlbSgnY2xhc3NncHRfYXBpX2tleScsYXBpS2V5KTsKICB9CgogIGZ1bmN0aW9uIGFjdGl2ZU1vZGVsKCl7CiAgICByZXR1cm4gc2V0dGluZ3MubW9kZWw9PT0nY3VzdG9tJyA/IChzZXR0aW5ncy5jdXN0b21Nb2RlbHx8J29wZW5haS9ncHQtNG8tbWluaScpIDogc2V0dGluZ3MubW9kZWw7CiAgfQoKICB2YXIgcGFnZUNvbnRleHQ9bnVsbDsKICB2YXIgY29tcGFjdD1zZXR0aW5ncy5jb21wYWN0OwoKICB2YXIgYm94PWRvY3VtZW50LmNyZWF0ZUVsZW1lbnQoJ2RpdicpOwogIGJveC5pZD0nY2xhc3NncHQtd2lkZ2V0JzsKICBmdW5jdGlvbiBib3hTaXplKCl7CiAgICByZXR1cm4gY29tcGFjdCA/IHt3OjI4MCxoOjM4MH0gOiB7dzozNDAsaDo1MjB9OwogIH0KICBmdW5jdGlvbiBhcHBseVNpemUoKXsKICAgIHZhciBzej1ib3hTaXplKCk7CiAgICBib3guc3R5bGUud2lkdGg9c3oudysncHgnOwogICAgYm94LnN0eWxlLmhlaWdodD1zei5oKydweCc7CiAgfQogIGJveC5zdHlsZS5jc3NUZXh0PSdwb3NpdGlvbjpmaXhlZDtib3R0b206MjBweDtyaWdodDoyMHB4O2JhY2tncm91bmQ6IzE0MTUxYTtjb2xvcjojZTllOWVmO2JvcmRlci1yYWRpdXM6MTRweDtib3gtc2hhZG93OjAgMTJweCA0MHB4IHJnYmEoMCwwLDAsLjUpO3otaW5kZXg6MjE0NzQ4MzY0NztkaXNwbGF5OmZsZXg7ZmxleC1kaXJlY3Rpb246Y29sdW1uO2ZvbnQtZmFtaWx5Oi1hcHBsZS1zeXN0ZW0sQmxpbmtNYWNTeXN0ZW1Gb250LFNlZ29lIFVJLFJvYm90byxzYW5zLXNlcmlmO292ZXJmbG93OmhpZGRlbjtib3JkZXI6MXB4IHNvbGlkICMyYTJiMzM7JzsKICBhcHBseVNpemUoKTsKCiAgaWYoc2V0dGluZ3MucmVtZW1iZXJQb3NpdGlvbil7CiAgICB0cnl7CiAgICAgIHZhciBwb3M9SlNPTi5wYXJzZShsb2NhbFN0b3JhZ2UuZ2V0SXRlbShQT1NJVElPTl9LRVkpfHwnbnVsbCcpOwogICAgICBpZihwb3MmJnBvcy5sZWZ0JiZwb3MudG9wKXsKICAgICAgICBib3guc3R5bGUubGVmdD1wb3MubGVmdDtib3guc3R5bGUudG9wPXBvcy50b3A7CiAgICAgICAgYm94LnN0eWxlLnJpZ2h0PSdhdXRvJztib3guc3R5bGUuYm90dG9tPSdhdXRvJzsKICAgICAgfQogICAgfWNhdGNoKGUpe30KICB9CgogIGJveC5pbm5lckhUTUw9CiAgICAnPGRpdiBpZD0iY2ctaGVhZGVyIiBzdHlsZT0icGFkZGluZzoxMHB4IDEycHg7YmFja2dyb3VuZDojMWMxZDI0O2N1cnNvcjptb3ZlO2Rpc3BsYXk6ZmxleDtqdXN0aWZ5LWNvbnRlbnQ6c3BhY2UtYmV0d2VlbjthbGlnbi1pdGVtczpjZW50ZXI7Ym9yZGVyLWJvdHRvbToxcHggc29saWQgIzJhMmIzMztmbGV4LXNocmluazowOyI+JysKICAgICAgJzxzcGFuIHN0eWxlPSJmb250LXdlaWdodDo3MDA7bGV0dGVyLXNwYWNpbmc6LjJweDtmb250LXNpemU6MTRweDsiPkNsYXNzPHNwYW4gc3R5bGU9ImNvbG9yOiM3YzllZmY7Ij5HUFQ8L3NwYW4+PC9zcGFuPicrCiAgICAgICc8c3BhbiBzdHlsZT0iZGlzcGxheTpmbGV4O2dhcDoxMHB4O2FsaWduLWl0ZW1zOmNlbnRlcjsiPicrCiAgICAgICAgJzxzcGFuIGlkPSJjZy1zZXR0aW5ncy1idG4iIHRpdGxlPSJTZXR0aW5ncyIgc3R5bGU9ImN1cnNvcjpwb2ludGVyO29wYWNpdHk6Ljc7Zm9udC1zaXplOjE0cHg7Ij4mIzk4ODE7PC9zcGFuPicrCiAgICAgICAgJzxzcGFuIGlkPSJjZy1jbG9zZSIgdGl0bGU9IkNsb3NlIiBzdHlsZT0iY3Vyc29yOnBvaW50ZXI7b3BhY2l0eTouNztmb250LXNpemU6MTVweDsiPiYjMTAwMDU7PC9zcGFuPicrCiAgICAgICc8L3NwYW4+JysKICAgICc8L2Rpdj4nKwogICAgJzxkaXYgaWQ9ImNnLXZpZXctY2hhdCIgc3R5bGU9ImRpc3BsYXk6ZmxleDtmbGV4LWRpcmVjdGlvbjpjb2x1bW47ZmxleDoxO21pbi1oZWlnaHQ6MDsiPicrCiAgICAgICc8ZGl2IGlkPSJjZy1tZXNzYWdlcyIgc3R5bGU9ImZsZXg6MTtvdmVyZmxvdy15OmF1dG87cGFkZGluZzoxMnB4O2ZvbnQtc2l6ZToxMy41cHg7bGluZS1oZWlnaHQ6MS40NTsiPjwvZGl2PicrCiAgICAgICc8ZGl2IGlkPSJjZy1jb250ZXh0LWJhciIgc3R5bGU9ImRpc3BsYXk6bm9uZTtwYWRkaW5nOjZweCAxMnB4O2JhY2tncm91bmQ6IzFjMWQyNDtib3JkZXItdG9wOjFweCBzb2xpZCAjMmEyYjMzO2ZvbnQtc2l6ZToxMS41cHg7Y29sb3I6IzhhOGI5NjthbGlnbi1pdGVtczpjZW50ZXI7anVzdGlmeS1jb250ZW50OnNwYWNlLWJldHdlZW47Ij48L2Rpdj4nKwogICAgICAnPGRpdiBpZD0iY2ctY29zdC1iYXIiIHN0eWxlPSJkaXNwbGF5Om5vbmU7cGFkZGluZzo0cHggMTJweDtmb250LXNpemU6MTAuNXB4O2NvbG9yOiM1ZjYwNmE7Zm9udC1mYW1pbHk6bW9ub3NwYWNlOyI+PC9kaXY+JysKICAgICAgJzxkaXYgc3R5bGU9ImRpc3BsYXk6ZmxleDtnYXA6NnB4O3BhZGRpbmc6MTBweDtib3JkZXItdG9wOjFweCBzb2xpZCAjMmEyYjMzO2JhY2tncm91bmQ6IzE3MTgxZjtmbGV4LXNocmluazowOyI+JysKICAgICAgICAnPGJ1dHRvbiBpZD0iY2ctcmVhZHBhZ2UiIHRpdGxlPSJSZWFkIHRoaXMgcGFnZSIgc3R5bGU9InBhZGRpbmc6OHB4IDlweDtib3JkZXItcmFkaXVzOjhweDtib3JkZXI6MXB4IHNvbGlkICMyYTJiMzM7YmFja2dyb3VuZDojMGYxMDE1O2NvbG9yOiNlOWU5ZWY7Y3Vyc29yOnBvaW50ZXI7Zm9udC1zaXplOjEzcHg7Ij4mIzEyODE5Njs8L2J1dHRvbj4nKwogICAgICAgICc8YnV0dG9uIGlkPSJjZy1taWMiIHRpdGxlPSJWb2ljZSBpbnB1dCIgc3R5bGU9InBhZGRpbmc6OHB4IDlweDtib3JkZXItcmFkaXVzOjhweDtib3JkZXI6MXB4IHNvbGlkICMyYTJiMzM7YmFja2dyb3VuZDojMGYxMDE1O2NvbG9yOiNlOWU5ZWY7Y3Vyc29yOnBvaW50ZXI7Zm9udC1zaXplOjEzcHg7Ij4mIzEyNzkwODs8L2J1dHRvbj4nKwogICAgICAgICc8aW5wdXQgaWQ9ImNnLWlucHV0IiBzdHlsZT0iZmxleDoxO3BhZGRpbmc6OHB4IDEwcHg7Ym9yZGVyLXJhZGl1czo4cHg7Ym9yZGVyOjFweCBzb2xpZCAjMmEyYjMzO2JhY2tncm91bmQ6IzBmMTAxNTtjb2xvcjojZTllOWVmO291dGxpbmU6bm9uZTtmb250LXNpemU6MTNweDttaW4td2lkdGg6MDsiIHBsYWNlaG9sZGVyPSJBc2sgQ2xhc3NHUFQuLi4iPicrCiAgICAgICAgJzxidXR0b24gaWQ9ImNnLXNlbmQiIHN0eWxlPSJwYWRkaW5nOjhweCAxMnB4O2JvcmRlci1yYWRpdXM6OHB4O2JvcmRlcjpub25lO2JhY2tncm91bmQ6IzdjOWVmZjtjb2xvcjojMGYxMDE1O2ZvbnQtd2VpZ2h0OjcwMDtjdXJzb3I6cG9pbnRlcjsiPkdvPC9idXR0b24+JysKICAgICAgJzwvZGl2PicrCiAgICAnPC9kaXY+JysKICAgICc8ZGl2IGlkPSJjZy12aWV3LXNldHRpbmdzIiBzdHlsZT0iZGlzcGxheTpub25lO2ZsZXgtZGlyZWN0aW9uOmNvbHVtbjtmbGV4OjE7bWluLWhlaWdodDowO292ZXJmbG93LXk6YXV0bztwYWRkaW5nOjE0cHg7Zm9udC1zaXplOjEyLjVweDsiPjwvZGl2Pic7CgogIGRvY3VtZW50LmJvZHkuYXBwZW5kQ2hpbGQoYm94KTsKCiAgZG9jdW1lbnQuZ2V0RWxlbWVudEJ5SWQoJ2NnLWNsb3NlJykub25jbGljaz1mdW5jdGlvbigpe2JveC5yZW1vdmUoKTt9OwoKICAvLyBkcmFnZ2luZwogIHZhciBkcmFnPWZhbHNlLG94PTAsb3k9MDsKICB2YXIgaGVhZGVyPWRvY3VtZW50LmdldEVsZW1lbnRCeUlkKCdjZy1oZWFkZXInKTsKICBoZWFkZXIub25tb3VzZWRvd249ZnVuY3Rpb24oZSl7CiAgICBpZihlLnRhcmdldC5pZD09PSdjZy1zZXR0aW5ncy1idG4nfHxlLnRhcmdldC5pZD09PSdjZy1jbG9zZScpcmV0dXJuOwogICAgZHJhZz10cnVlOwogICAgdmFyIHI9Ym94LmdldEJvdW5kaW5nQ2xpZW50UmVjdCgpOwogICAgb3g9ZS5jbGllbnRYLXIubGVmdDtveT1lLmNsaWVudFktci50b3A7CiAgICBib3guc3R5bGUucmlnaHQ9J2F1dG8nO2JveC5zdHlsZS5ib3R0b209J2F1dG8nOwogICAgYm94LnN0eWxlLmxlZnQ9ci5sZWZ0KydweCc7Ym94LnN0eWxlLnRvcD1yLnRvcCsncHgnOwogIH07CiAgZG9jdW1lbnQuYWRkRXZlbnRMaXN0ZW5lcignbW91c2Vtb3ZlJyxmdW5jdGlvbihlKXsKICAgIGlmKGRyYWcpe2JveC5zdHlsZS5sZWZ0PShlLmNsaWVudFgtb3gpKydweCc7Ym94LnN0eWxlLnRvcD0oZS5jbGllbnRZLW95KSsncHgnO30KICB9KTsKICBkb2N1bWVudC5hZGRFdmVudExpc3RlbmVyKCdtb3VzZXVwJyxmdW5jdGlvbigpewogICAgaWYoZHJhZyYmc2V0dGluZ3MucmVtZW1iZXJQb3NpdGlvbil7CiAgICAgIGxvY2FsU3RvcmFnZS5zZXRJdGVtKFBPU0lUSU9OX0tFWSxKU09OLnN0cmluZ2lmeSh7bGVmdDpib3guc3R5bGUubGVmdCx0b3A6Ym94LnN0eWxlLnRvcH0pKTsKICAgIH0KICAgIGRyYWc9ZmFsc2U7CiAgfSk7CgogIC8vIGtleWJvYXJkIHNob3J0Y3V0OiBDdHJsK1NoaWZ0K0cgdG9nZ2xlcyB2aXNpYmlsaXR5CiAgZnVuY3Rpb24gc2hvcnRjdXRIYW5kbGVyKGUpewogICAgaWYoIXNldHRpbmdzLmtleWJvYXJkU2hvcnRjdXQpcmV0dXJuOwogICAgaWYoZS5jdHJsS2V5JiZlLnNoaWZ0S2V5JiYoZS5rZXk9PT0nRyd8fGUua2V5PT09J2cnKSl7CiAgICAgIGUucHJldmVudERlZmF1bHQoKTsKICAgICAgYm94LnN0eWxlLmRpc3BsYXkgPSBib3guc3R5bGUuZGlzcGxheT09PSdub25lJyA/ICdmbGV4JyA6ICdub25lJzsKICAgIH0KICB9CiAgZG9jdW1lbnQuYWRkRXZlbnRMaXN0ZW5lcigna2V5ZG93bicsc2hvcnRjdXRIYW5kbGVyKTsKCiAgLy8gLS0tIHRyYWNrIGxhc3QgdHlwYWJsZSBmaWVsZCBvdXRzaWRlIHdpZGdldCAtLS0KICB2YXIgbGFzdEZvY3VzZWRFbD1udWxsOwogIGZ1bmN0aW9uIGlzVHlwYWJsZUZpZWxkKGVsKXsKICAgIGlmKCFlbClyZXR1cm4gZmFsc2U7CiAgICBpZihib3guY29udGFpbnMoZWwpKXJldHVybiBmYWxzZTsKICAgIHZhciB0YWc9ZWwudGFnTmFtZTsKICAgIGlmKHRhZz09PSdURVhUQVJFQScpcmV0dXJuIHRydWU7CiAgICBpZih0YWc9PT0nSU5QVVQnKXsKICAgICAgdmFyIHQ9KGVsLmdldEF0dHJpYnV0ZSgndHlwZScpfHwndGV4dCcpLnRvTG93ZXJDYXNlKCk7CiAgICAgIHJldHVybiBbJ3RleHQnLCdzZWFyY2gnLCdlbWFpbCcsJ3VybCcsJ3RlbCddLmluZGV4T2YodCkhPT0tMTsKICAgIH0KICAgIGlmKGVsLmlzQ29udGVudEVkaXRhYmxlKXJldHVybiB0cnVlOwogICAgcmV0dXJuIGZhbHNlOwogIH0KICBkb2N1bWVudC5hZGRFdmVudExpc3RlbmVyKCdmb2N1c2luJyxmdW5jdGlvbihlKXsKICAgIGlmKGlzVHlwYWJsZUZpZWxkKGUudGFyZ2V0KSlsYXN0Rm9jdXNlZEVsPWUudGFyZ2V0OwogIH0sdHJ1ZSk7CgogIGZ1bmN0aW9uIGluc2VydEludG9GaWVsZChlbCx0ZXh0KXsKICAgIGlmKCFlbClyZXR1cm4gZmFsc2U7CiAgICBpZihlbC50YWdOYW1lPT09J1RFWFRBUkVBJ3x8ZWwudGFnTmFtZT09PSdJTlBVVCcpewogICAgICB2YXIgc3RhcnQ9ZWwuc2VsZWN0aW9uU3RhcnQ9PW51bGw/ZWwudmFsdWUubGVuZ3RoOmVsLnNlbGVjdGlvblN0YXJ0OwogICAgICB2YXIgZW5kPWVsLnNlbGVjdGlvbkVuZD09bnVsbD9lbC52YWx1ZS5sZW5ndGg6ZWwuc2VsZWN0aW9uRW5kOwogICAgICBlbC52YWx1ZT1lbC52YWx1ZS5zbGljZSgwLHN0YXJ0KSt0ZXh0K2VsLnZhbHVlLnNsaWNlKGVuZCk7CiAgICAgIHZhciBwb3M9c3RhcnQrdGV4dC5sZW5ndGg7CiAgICAgIGVsLnNldFNlbGVjdGlvblJhbmdlKHBvcyxwb3MpOwogICAgICBlbC5kaXNwYXRjaEV2ZW50KG5ldyBFdmVudCgnaW5wdXQnLHtidWJibGVzOnRydWV9KSk7CiAgICAgIGVsLmZvY3VzKCk7CiAgICAgIHJldHVybiB0cnVlOwogICAgfQogICAgaWYoZWwuaXNDb250ZW50RWRpdGFibGUpewogICAgICBlbC5mb2N1cygpOwogICAgICB2YXIgc2VsPXdpbmRvdy5nZXRTZWxlY3Rpb24oKTsKICAgICAgaWYoc2VsJiZzZWwucmFuZ2VDb3VudD4wKXsKICAgICAgICB2YXIgcmFuZ2U9c2VsLmdldFJhbmdlQXQoMCk7CiAgICAgICAgcmFuZ2UuZGVsZXRlQ29udGVudHMoKTsKICAgICAgICByYW5nZS5pbnNlcnROb2RlKGRvY3VtZW50LmNyZWF0ZVRleHROb2RlKHRleHQpKTsKICAgICAgICByYW5nZS5jb2xsYXBzZShmYWxzZSk7CiAgICAgIH1lbHNlewogICAgICAgIGVsLnRleHRDb250ZW50Kz10ZXh0OwogICAgICB9CiAgICAgIGVsLmRpc3BhdGNoRXZlbnQobmV3IEV2ZW50KCdpbnB1dCcse2J1YmJsZXM6dHJ1ZX0pKTsKICAgICAgcmV0dXJuIHRydWU7CiAgICB9CiAgICByZXR1cm4gZmFsc2U7CiAgfQoKICAvLyAtLS0gbWluaW1hbCBtYXJrZG93biByZW5kZXJlciAoYm9sZCwgaXRhbGljcywgaW5saW5lIGNvZGUsIGNvZGUgYmxvY2tzLCBsaW5lIGJyZWFrcykgLS0tCiAgZnVuY3Rpb24gZXNjYXBlSHRtbChzKXsKICAgIHJldHVybiBzLnJlcGxhY2UoLyYvZywnJmFtcDsnKS5yZXBsYWNlKC88L2csJyZsdDsnKS5yZXBsYWNlKC8+L2csJyZndDsnKTsKICB9CiAgZnVuY3Rpb24gcmVuZGVyTWFya2Rvd24odGV4dCl7CiAgICB2YXIgZXNjYXBlZD1lc2NhcGVIdG1sKHRleHQpOwogICAgZXNjYXBlZD1lc2NhcGVkLnJlcGxhY2UoL2BgYChbXHNcU10qPylgYGAvZyxmdW5jdGlvbihtLGNvZGUpewogICAgICByZXR1cm4gJzxwcmUgc3R5bGU9ImJhY2tncm91bmQ6IzBhMGIwZjtib3JkZXI6MXB4IHNvbGlkICMyYTJiMzM7Ym9yZGVyLXJhZGl1czo2cHg7cGFkZGluZzo4cHg7b3ZlcmZsb3cteDphdXRvO21hcmdpbjo2cHggMDsiPjxjb2RlIHN0eWxlPSJmb250LWZhbWlseTpKZXRCcmFpbnMgTW9ubyxtb25vc3BhY2U7Zm9udC1zaXplOjExLjVweDsiPicrY29kZS50cmltKCkrJzwvY29kZT48L3ByZT4nOwogICAgfSk7CiAgICBlc2NhcGVkPWVzY2FwZWQucmVwbGFjZSgvYChbXmBdKylgL2csJzxjb2RlIHN0eWxlPSJiYWNrZ3JvdW5kOiMwYTBiMGY7cGFkZGluZzoxcHggNXB4O2JvcmRlci1yYWRpdXM6NHB4O2ZvbnQtZmFtaWx5OkpldEJyYWlucyBNb25vLG1vbm9zcGFjZTtmb250LXNpemU6MTJweDsiPiQxPC9jb2RlPicpOwogICAgZXNjYXBlZD1lc2NhcGVkLnJlcGxhY2UoL1wqXCooW14qXSspXCpcKi9nLCc8c3Ryb25nPiQxPC9zdHJvbmc+Jyk7CiAgICBlc2NhcGVkPWVzY2FwZWQucmVwbGFjZSgvXCooW14qXSspXCovZywnPGVtPiQxPC9lbT4nKTsKICAgIGVzY2FwZWQ9ZXNjYXBlZC5yZXBsYWNlKC9cbi9nLCc8YnI+Jyk7CiAgICByZXR1cm4gZXNjYXBlZDsKICB9CgogIHZhciBob3N0bmFtZT1sb2NhdGlvbi5ob3N0bmFtZXx8J3BhZ2UnOwogIHZhciBoaXN0b3J5S2V5PUhJU1RPUllfUFJFRklYK2hvc3RuYW1lOwogIHZhciBzeXN0ZW1Qcm9tcHQ9J1lvdSBhcmUgQ2xhc3NHUFQsIGEgY29uY2lzZSwgaGVscGZ1bCBhc3Npc3RhbnQgZW1iZWRkZWQgYXMgYSBmbG9hdGluZyB3aWRnZXQgb24gYSB3ZWJwYWdlLiBXaGVuIHRoZSB1c2VyIGhhcyBzaGFyZWQgdGhlIHBhZ2UgY29udGVudCB3aXRoIHlvdSwgdXNlIGl0IHRvIGFuc3dlciBxdWVzdGlvbnMsIGV4cGxhaW4gdGhpbmdzLCBvciBzdW1tYXJpemUg4oCUIGJ1dCBuZXZlciBqdXN0IHByb2R1Y2UgZmluaXNoZWQgYW5zd2VycyB0byBncmFkZWQgYXNzaWdubWVudHMsIHF1aXp6ZXMsIG9yIGhvbWV3b3JrIHByb2JsZW1zIG9uIHRoZWlyIGJlaGFsZjsgaW5zdGVhZCBoZWxwIHRoZW0gdW5kZXJzdGFuZCB0aGUgbWF0ZXJpYWwuIFRoZSB1c2VyIG1heSBkcmFmdCBtZXNzYWdlcyAocmVwbGllcywgbm90ZXMsIHNuaXBwZXRzKSB0aGF0IHRoZXkgd3JpdGUgdGhlbXNlbHZlcyBpbnRvIGEgdGV4dCBmaWVsZCBvbiB0aGUgcGFnZSB1c2luZyBhbiBpbnNlcnQgYnV0dG9uIHlvdSBwcm92aWRlIOKAlCB0aGF0IGlzIHRoZWlyIG93biBjb21wb3NlZCB0ZXh0LCBub3QgeW91IGFuc3dlcmluZyBxdWVzdGlvbnMgZm9yIHRoZW0uJzsKICB2YXIgbWVzc2FnZXM9W3tyb2xlOidzeXN0ZW0nLGNvbnRlbnQ6c3lzdGVtUHJvbXB0fV07CgogIHZhciBtc2dCb3g9ZG9jdW1lbnQuZ2V0RWxlbWVudEJ5SWQoJ2NnLW1lc3NhZ2VzJyk7CiAgdmFyIGNvbnRleHRCYXI9ZG9jdW1lbnQuZ2V0RWxlbWVudEJ5SWQoJ2NnLWNvbnRleHQtYmFyJyk7CiAgdmFyIGNvc3RCYXI9ZG9jdW1lbnQuZ2V0RWxlbWVudEJ5SWQoJ2NnLWNvc3QtYmFyJyk7CgogIGZ1bmN0aW9uIHJlbmRlck1zZ0JvZHkoY29udGFpbmVyLHRleHQpewogICAgaWYoc2V0dGluZ3MubWFya2Rvd24pewogICAgICBjb250YWluZXIuaW5uZXJIVE1MPXJlbmRlck1hcmtkb3duKHRleHQpOwogICAgfWVsc2V7CiAgICAgIGNvbnRhaW5lci50ZXh0Q29udGVudD10ZXh0OwogICAgICBjb250YWluZXIuc3R5bGUud2hpdGVTcGFjZT0ncHJlLXdyYXAnOwogICAgfQogIH0KCiAgZnVuY3Rpb24gYWRkTXNnKHJvbGUsdGV4dCl7CiAgICB2YXIgZD1kb2N1bWVudC5jcmVhdGVFbGVtZW50KCdkaXYnKTsKICAgIGQuc3R5bGUubWFyZ2luPScwIDAgMTBweCAwJzsKICAgIHZhciB3aG89ZG9jdW1lbnQuY3JlYXRlRWxlbWVudCgnZGl2Jyk7CiAgICB3aG8uc3R5bGUuY3NzVGV4dD0nZm9udC1zaXplOjExcHg7Zm9udC13ZWlnaHQ6NzAwO29wYWNpdHk6LjU1O21hcmdpbi1ib3R0b206MnB4O3RleHQtdHJhbnNmb3JtOnVwcGVyY2FzZTtsZXR0ZXItc3BhY2luZzouNHB4Oyc7CiAgICB3aG8udGV4dENvbnRlbnQ9cm9sZT09PSd1c2VyJz8nWW91JzonQ2xhc3NHUFQnOwogICAgdmFyIGJvZHk9ZG9jdW1lbnQuY3JlYXRlRWxlbWVudCgnZGl2Jyk7CiAgICByZW5kZXJNc2dCb2R5KGJvZHksdGV4dCk7CiAgICBkLmFwcGVuZENoaWxkKHdobyk7ZC5hcHBlbmRDaGlsZChib2R5KTsKCiAgICBpZihyb2xlPT09J2Fzc2lzdGFudCcpewogICAgICB2YXIgYWN0aW9ucz1kb2N1bWVudC5jcmVhdGVFbGVtZW50KCdkaXYnKTsKICAgICAgYWN0aW9ucy5zdHlsZS5jc3NUZXh0PSdkaXNwbGF5OmZsZXg7Z2FwOjhweDttYXJnaW4tdG9wOjZweDtmbGV4LXdyYXA6d3JhcDsnOwogICAgICB2YXIgY29weUJ0bj1kb2N1bWVudC5jcmVhdGVFbGVtZW50KCdidXR0b24nKTsKICAgICAgY29weUJ0bi50ZXh0Q29udGVudD0nY29weSc7CiAgICAgIGNvcHlCdG4uc3R5bGUuY3NzVGV4dD0nZm9udC1zaXplOjExcHg7cGFkZGluZzo0cHggOHB4O2JvcmRlci1yYWRpdXM6NnB4O2JvcmRlcjoxcHggc29saWQgIzJhMmIzMztiYWNrZ3JvdW5kOiMxOTFhMjE7Y29sb3I6IzhhOGI5NjtjdXJzb3I6cG9pbnRlcjsnOwogICAgICBjb3B5QnRuLm9uY2xpY2s9ZnVuY3Rpb24oKXsKICAgICAgICBuYXZpZ2F0b3IuY2xpcGJvYXJkLndyaXRlVGV4dCh0ZXh0KS50aGVuKGZ1bmN0aW9uKCl7CiAgICAgICAgICBjb3B5QnRuLnRleHRDb250ZW50PSdjb3BpZWQnOwogICAgICAgICAgc2V0VGltZW91dChmdW5jdGlvbigpe2NvcHlCdG4udGV4dENvbnRlbnQ9J2NvcHknO30sMTIwMCk7CiAgICAgICAgfSk7CiAgICAgIH07CiAgICAgIGFjdGlvbnMuYXBwZW5kQ2hpbGQoY29weUJ0bik7CiAgICAgIGlmKHNldHRpbmdzLmFsbG93SW5zZXJ0KXsKICAgICAgICB2YXIgaW5zZXJ0QnRuPWRvY3VtZW50LmNyZWF0ZUVsZW1lbnQoJ2J1dHRvbicpOwogICAgICAgIGluc2VydEJ0bi50ZXh0Q29udGVudD0naW5zZXJ0IGludG8gcGFnZSc7CiAgICAgICAgaW5zZXJ0QnRuLnN0eWxlLmNzc1RleHQ9J2ZvbnQtc2l6ZToxMXB4O3BhZGRpbmc6NHB4IDhweDtib3JkZXItcmFkaXVzOjZweDtib3JkZXI6MXB4IHNvbGlkICMyYTJiMzM7YmFja2dyb3VuZDojMTkxYTIxO2NvbG9yOiM4YThiOTY7Y3Vyc29yOnBvaW50ZXI7JzsKICAgICAgICBpbnNlcnRCdG4ub25jbGljaz1mdW5jdGlvbigpewogICAgICAgICAgaWYoIWxhc3RGb2N1c2VkRWwpewogICAgICAgICAgICBpbnNlcnRCdG4udGV4dENvbnRlbnQ9J2NsaWNrIGEgdGV4dCBib3ggb24gdGhlIHBhZ2UgZmlyc3QnOwogICAgICAgICAgICBzZXRUaW1lb3V0KGZ1bmN0aW9uKCl7aW5zZXJ0QnRuLnRleHRDb250ZW50PSdpbnNlcnQgaW50byBwYWdlJzt9LDE4MDApOwogICAgICAgICAgICByZXR1cm47CiAgICAgICAgICB9CiAgICAgICAgICB2YXIgb2s9aW5zZXJ0SW50b0ZpZWxkKGxhc3RGb2N1c2VkRWwsdGV4dCk7CiAgICAgICAgICBpbnNlcnRCdG4udGV4dENvbnRlbnQ9b2s/J2luc2VydGVkJzonZmFpbGVkJzsKICAgICAgICAgIHNldFRpbWVvdXQoZnVuY3Rpb24oKXtpbnNlcnRCdG4udGV4dENvbnRlbnQ9J2luc2VydCBpbnRvIHBhZ2UnO30sMTIwMCk7CiAgICAgICAgfTsKICAgICAgICBhY3Rpb25zLmFwcGVuZENoaWxkKGluc2VydEJ0bik7CiAgICAgIH0KICAgICAgZC5hcHBlbmRDaGlsZChhY3Rpb25zKTsKICAgIH0KCiAgICBtc2dCb3guYXBwZW5kQ2hpbGQoZCk7CiAgICBtc2dCb3guc2Nyb2xsVG9wPW1zZ0JveC5zY3JvbGxIZWlnaHQ7CiAgICByZXR1cm4gYm9keTsKICB9CgogIC8vIGxvYWQgaGlzdG9yeSBpZiBlbmFibGVkCiAgaWYoc2V0dGluZ3MucmVtZW1iZXJIaXN0b3J5KXsKICAgIHRyeXsKICAgICAgdmFyIHNhdmVkSGlzdD1KU09OLnBhcnNlKGxvY2FsU3RvcmFnZS5nZXRJdGVtKGhpc3RvcnlLZXkpfHwnbnVsbCcpOwogICAgICBpZihzYXZlZEhpc3QmJnNhdmVkSGlzdC5sZW5ndGgpewogICAgICAgIHNhdmVkSGlzdC5mb3JFYWNoKGZ1bmN0aW9uKG0pewogICAgICAgICAgbWVzc2FnZXMucHVzaChtKTsKICAgICAgICAgIGFkZE1zZyhtLnJvbGUsbS5jb250ZW50KTsKICAgICAgICB9KTsKICAgICAgfQogICAgfWNhdGNoKGUpe30KICB9CgogIGZ1bmN0aW9uIHBlcnNpc3RIaXN0b3J5KCl7CiAgICBpZighc2V0dGluZ3MucmVtZW1iZXJIaXN0b3J5KXJldHVybjsKICAgIHZhciB0b1NhdmU9bWVzc2FnZXMuZmlsdGVyKGZ1bmN0aW9uKG0pe3JldHVybiBtLnJvbGUhPT0nc3lzdGVtJzt9KS5zbGljZSgtNDApOwogICAgbG9jYWxTdG9yYWdlLnNldEl0ZW0oaGlzdG9yeUtleSxKU09OLnN0cmluZ2lmeSh0b1NhdmUpKTsKICB9CgogIGZ1bmN0aW9uIGV4dHJhY3RQYWdlVGV4dCgpewogICAgdmFyIGNsb25lPWRvY3VtZW50LmJvZHkuY2xvbmVOb2RlKHRydWUpOwogICAgdmFyIGtpbGw9Y2xvbmUucXVlcnlTZWxlY3RvckFsbCgnI2NsYXNzZ3B0LXdpZGdldCxzY3JpcHQsc3R5bGUsbm9zY3JpcHQsc3ZnLGlmcmFtZScpOwogICAga2lsbC5mb3JFYWNoKGZ1bmN0aW9uKGVsKXtlbC5yZW1vdmUoKTt9KTsKICAgIHZhciB0ZXh0PWNsb25lLmlubmVyVGV4dHx8Y2xvbmUudGV4dENvbnRlbnR8fCcnOwogICAgdGV4dD10ZXh0LnJlcGxhY2UoL1xuezMsfS9nLCdcblxuJykucmVwbGFjZSgvWyBcdF17Mix9L2csJyAnKS50cmltKCk7CiAgICB2YXIgTUFYTEVOPTEyMDAwOwogICAgaWYodGV4dC5sZW5ndGg+TUFYTEVOKXt0ZXh0PXRleHQuc2xpY2UoMCxNQVhMRU4pKydcblxuWy4uLnBhZ2UgdHJ1bmNhdGVkLi4uXSc7fQogICAgcmV0dXJuIHRleHQ7CiAgfQoKICBkb2N1bWVudC5nZXRFbGVtZW50QnlJZCgnY2ctcmVhZHBhZ2UnKS5vbmNsaWNrPWZ1bmN0aW9uKCl7CiAgICB2YXIgdGV4dD1leHRyYWN0UGFnZVRleHQoKTsKICAgIGlmKCF0ZXh0KXthZGRNc2coJ2Fzc2lzdGFudCcsIkNvdWxkbid0IGZpbmQgcmVhZGFibGUgdGV4dCBvbiB0aGlzIHBhZ2UuIik7cmV0dXJuO30KICAgIHBhZ2VDb250ZXh0PXRleHQ7CiAgICBjb250ZXh0QmFyLnN0eWxlLmRpc3BsYXk9J2ZsZXgnOwogICAgY29udGV4dEJhci5pbm5lckhUTUw9JzxzcGFuPiYjMTI4MTk2OyBwYWdlIGxvYWRlZCAoJyt0ZXh0Lmxlbmd0aCsnIGNoYXJzKTwvc3Bhbj48c3BhbiBpZD0iY2ctY2xlYXItY3R4IiBzdHlsZT0iY3Vyc29yOnBvaW50ZXI7Y29sb3I6IzdjOWVmZjsiPmNsZWFyPC9zcGFuPic7CiAgICBkb2N1bWVudC5nZXRFbGVtZW50QnlJZCgnY2ctY2xlYXItY3R4Jykub25jbGljaz1mdW5jdGlvbigpewogICAgICBwYWdlQ29udGV4dD1udWxsOwogICAgICBjb250ZXh0QmFyLnN0eWxlLmRpc3BsYXk9J25vbmUnOwogICAgfTsKICAgIGFkZE1zZygnYXNzaXN0YW50JywnR290IHRoZSBwYWdlIOKAlCBhc2sgbWUgYW55dGhpbmcgYWJvdXQgaXQgKHN1bW1hcml6ZSBpdCwgZXhwbGFpbiBhIHBhcnQsIGRlZmluZSBhIHRlcm0sIGV0YykuJyk7CiAgfTsKCiAgLy8gdm9pY2UgaW5wdXQKICB2YXIgcmVjb2duaXppbmc9ZmFsc2U7CiAgdmFyIFNwZWVjaFJlYz13aW5kb3cuU3BlZWNoUmVjb2duaXRpb258fHdpbmRvdy53ZWJraXRTcGVlY2hSZWNvZ25pdGlvbjsKICB2YXIgbWljQnRuPWRvY3VtZW50LmdldEVsZW1lbnRCeUlkKCdjZy1taWMnKTsKICBpZighc2V0dGluZ3Mudm9pY2VJbnB1dHx8IVNwZWVjaFJlYyl7CiAgICBtaWNCdG4uc3R5bGUuZGlzcGxheT0nbm9uZSc7CiAgfWVsc2V7CiAgICB2YXIgcmVjb2duaXRpb249bmV3IFNwZWVjaFJlYygpOwogICAgcmVjb2duaXRpb24uY29udGludW91cz1mYWxzZTsKICAgIHJlY29nbml0aW9uLmludGVyaW1SZXN1bHRzPWZhbHNlOwogICAgcmVjb2duaXRpb24ub25yZXN1bHQ9ZnVuY3Rpb24oZSl7CiAgICAgIHZhciB0cmFuc2NyaXB0PWUucmVzdWx0c1swXVswXS50cmFuc2NyaXB0OwogICAgICB2YXIgaW5wdXQ9ZG9jdW1lbnQuZ2V0RWxlbWVudEJ5SWQoJ2NnLWlucHV0Jyk7CiAgICAgIGlucHV0LnZhbHVlPShpbnB1dC52YWx1ZT9pbnB1dC52YWx1ZSsnICc6JycpK3RyYW5zY3JpcHQ7CiAgICB9OwogICAgcmVjb2duaXRpb24ub25lbmQ9ZnVuY3Rpb24oKXtyZWNvZ25pemluZz1mYWxzZTttaWNCdG4uc3R5bGUub3BhY2l0eT0nLjcnO307CiAgICBtaWNCdG4ub25jbGljaz1mdW5jdGlvbigpewogICAgICBpZihyZWNvZ25pemluZylyZXR1cm47CiAgICAgIHJlY29nbml6aW5nPXRydWU7CiAgICAgIG1pY0J0bi5zdHlsZS5vcGFjaXR5PScxJzsKICAgICAgdHJ5e3JlY29nbml0aW9uLnN0YXJ0KCk7fWNhdGNoKGUpe3JlY29nbml6aW5nPWZhbHNlO30KICAgIH07CiAgfQoKICAvLyByb3VnaCBjb3N0IGVzdGltYXRlICh2ZXJ5IGFwcHJveGltYXRlLCAkIHBlciAxTSBpbnB1dCB0b2tlbnMsIGhldXJpc3RpYyA0IGNoYXJzL3Rva2VuKQogIGZ1bmN0aW9uIGVzdGltYXRlQ29zdCgpewogICAgdmFyIHByZXNldD1NT0RFTF9QUkVTRVRTLmZpbmQoZnVuY3Rpb24ocCl7cmV0dXJuIHAuaWQ9PT1zZXR0aW5ncy5tb2RlbDt9KTsKICAgIGlmKCFwcmVzZXR8fHByZXNldC5wcmljZT09bnVsbCl7Y29zdEJhci5zdHlsZS5kaXNwbGF5PSdub25lJztyZXR1cm47fQogICAgdmFyIHRvdGFsQ2hhcnM9bWVzc2FnZXMucmVkdWNlKGZ1bmN0aW9uKGEsbSl7cmV0dXJuIGErKG0uY29udGVudD9tLmNvbnRlbnQubGVuZ3RoOjApO30sMCk7CiAgICB2YXIgdG9rZW5zPU1hdGgucm91bmQodG90YWxDaGFycy80KTsKICAgIHZhciBjb3N0PSh0b2tlbnMvMTAwMDAwMCkqcHJlc2V0LnByaWNlOwogICAgY29zdEJhci5zdHlsZS5kaXNwbGF5PSdibG9jayc7CiAgICBjb3N0QmFyLnRleHRDb250ZW50PSd+Jyt0b2tlbnMrJyB0b2tlbnMgdGhpcyBzZXNzaW9uIMK3IH4kJytjb3N0LnRvRml4ZWQoNCkrJyBlc3QuJzsKICB9CgogIGFzeW5jIGZ1bmN0aW9uIHNlbmQoKXsKICAgIHZhciBpbnB1dD1kb2N1bWVudC5nZXRFbGVtZW50QnlJZCgnY2ctaW5wdXQnKTsKICAgIHZhciB0ZXh0PWlucHV0LnZhbHVlLnRyaW0oKTsKICAgIGlmKCF0ZXh0KXJldHVybjsKICAgIGlucHV0LnZhbHVlPScnOwogICAgYWRkTXNnKCd1c2VyJyx0ZXh0KTsKCiAgICB2YXIgb3V0Z29pbmc9bWVzc2FnZXMuc2xpY2UoKTsKICAgIGlmKHBhZ2VDb250ZXh0KXsKICAgICAgb3V0Z29pbmcucHVzaCh7cm9sZTonc3lzdGVtJyxjb250ZW50OidDb250ZW50IG9mIHRoZSBjdXJyZW50IHdlYnBhZ2UgKHRpdGxlOiAnK2RvY3VtZW50LnRpdGxlKycsIHVybDogJytsb2NhdGlvbi5ocmVmKycpOlxuXG4nK3BhZ2VDb250ZXh0fSk7CiAgICB9CiAgICBtZXNzYWdlcy5wdXNoKHtyb2xlOid1c2VyJyxjb250ZW50OnRleHR9KTsKICAgIG91dGdvaW5nLnB1c2goe3JvbGU6J3VzZXInLGNvbnRlbnQ6dGV4dH0pOwogICAgcGVyc2lzdEhpc3RvcnkoKTsKICAgIGlmKHNldHRpbmdzLnNob3dDb3N0KWVzdGltYXRlQ29zdCgpOwoKICAgIHZhciB0aGlua2luZz1hZGRNc2coJ2Fzc2lzdGFudCcsJy4uLicpOwogICAgdHJ5ewogICAgICB2YXIgcmVzPWF3YWl0IGZldGNoKCdodHRwczovL29wZW5yb3V0ZXIuYWkvYXBpL3YxL2NoYXQvY29tcGxldGlvbnMnLHsKICAgICAgICBtZXRob2Q6J1BPU1QnLAogICAgICAgIGhlYWRlcnM6ewogICAgICAgICAgJ0NvbnRlbnQtVHlwZSc6J2FwcGxpY2F0aW9uL2pzb24nLAogICAgICAgICAgJ0F1dGhvcml6YXRpb24nOidCZWFyZXIgJythcGlLZXksCiAgICAgICAgICAnSFRUUC1SZWZlcmVyJzpsb2NhdGlvbi5ocmVmLAogICAgICAgICAgJ1gtVGl0bGUnOidDbGFzc0dQVCcKICAgICAgICB9LAogICAgICAgIGJvZHk6SlNPTi5zdHJpbmdpZnkoe21vZGVsOmFjdGl2ZU1vZGVsKCksbWVzc2FnZXM6b3V0Z29pbmd9KQogICAgICB9KTsKICAgICAgdmFyIGRhdGE9YXdhaXQgcmVzLmpzb24oKTsKICAgICAgaWYoZGF0YS5lcnJvcil7CiAgICAgICAgcmVuZGVyTXNnQm9keSh0aGlua2luZywnRXJyb3I6ICcrZGF0YS5lcnJvci5tZXNzYWdlKTsKICAgICAgICByZXR1cm47CiAgICAgIH0KICAgICAgdmFyIHJlcGx5PShkYXRhLmNob2ljZXMmJmRhdGEuY2hvaWNlc1swXSYmZGF0YS5jaG9pY2VzWzBdLm1lc3NhZ2UmJmRhdGEuY2hvaWNlc1swXS5tZXNzYWdlLmNvbnRlbnQpfHwnTm8gcmVzcG9uc2UuJzsKICAgICAgcmVuZGVyTXNnQm9keSh0aGlua2luZyxyZXBseSk7CiAgICAgIG1lc3NhZ2VzLnB1c2goe3JvbGU6J2Fzc2lzdGFudCcsY29udGVudDpyZXBseX0pOwogICAgICBwZXJzaXN0SGlzdG9yeSgpOwogICAgICBpZihzZXR0aW5ncy5zaG93Q29zdCllc3RpbWF0ZUNvc3QoKTsKICAgIH1jYXRjaChlKXsKICAgICAgcmVuZGVyTXNnQm9keSh0aGlua2luZywnRXJyb3I6ICcrZS5tZXNzYWdlKTsKICAgIH0KICB9CiAgZG9jdW1lbnQuZ2V0RWxlbWVudEJ5SWQoJ2NnLXNlbmQnKS5vbmNsaWNrPXNlbmQ7CiAgZG9jdW1lbnQuZ2V0RWxlbWVudEJ5SWQoJ2NnLWlucHV0JykuYWRkRXZlbnRMaXN0ZW5lcigna2V5ZG93bicsZnVuY3Rpb24oZSl7CiAgICBpZihlLmtleT09PSdFbnRlcicpc2VuZCgpOwogIH0pOwoKICAvLyA9PT09PSBzZXR0aW5ncyBwYW5lbCA9PT09PQogIHZhciBjaGF0Vmlldz1kb2N1bWVudC5nZXRFbGVtZW50QnlJZCgnY2ctdmlldy1jaGF0Jyk7CiAgdmFyIHNldHRpbmdzVmlldz1kb2N1bWVudC5nZXRFbGVtZW50QnlJZCgnY2ctdmlldy1zZXR0aW5ncycpOwoKICBmdW5jdGlvbiBmaWVsZFJvdyhsYWJlbFRleHQsaW5wdXRFbCl7CiAgICB2YXIgcm93PWRvY3VtZW50LmNyZWF0ZUVsZW1lbnQoJ2RpdicpOwogICAgcm93LnN0eWxlLmNzc1RleHQ9J21hcmdpbi1ib3R0b206MTRweDsnOwogICAgdmFyIGxhYmVsPWRvY3VtZW50LmNyZWF0ZUVsZW1lbnQoJ2RpdicpOwogICAgbGFiZWwudGV4dENvbnRlbnQ9bGFiZWxUZXh0OwogICAgbGFiZWwuc3R5bGUuY3NzVGV4dD0nZm9udC1zaXplOjExcHg7Y29sb3I6IzhhOGI5NjttYXJnaW4tYm90dG9tOjVweDt0ZXh0LXRyYW5zZm9ybTp1cHBlcmNhc2U7bGV0dGVyLXNwYWNpbmc6LjNweDsnOwogICAgcm93LmFwcGVuZENoaWxkKGxhYmVsKTsKICAgIHJvdy5hcHBlbmRDaGlsZChpbnB1dEVsKTsKICAgIHJldHVybiByb3c7CiAgfQogIGZ1bmN0aW9uIHRvZ2dsZVJvdyhsYWJlbFRleHQsa2V5KXsKICAgIHZhciByb3c9ZG9jdW1lbnQuY3JlYXRlRWxlbWVudCgnbGFiZWwnKTsKICAgIHJvdy5zdHlsZS5jc3NUZXh0PSdkaXNwbGF5OmZsZXg7YWxpZ24taXRlbXM6Y2VudGVyO2p1c3RpZnktY29udGVudDpzcGFjZS1iZXR3ZWVuO3BhZGRpbmc6OXB4IDA7Ym9yZGVyLWJvdHRvbToxcHggc29saWQgIzIyMjMyYjtjdXJzb3I6cG9pbnRlcjtmb250LXNpemU6MTIuNXB4Oyc7CiAgICB2YXIgc3Bhbj1kb2N1bWVudC5jcmVhdGVFbGVtZW50KCdzcGFuJyk7CiAgICBzcGFuLnRleHRDb250ZW50PWxhYmVsVGV4dDsKICAgIHZhciBjYj1kb2N1bWVudC5jcmVhdGVFbGVtZW50KCdpbnB1dCcpOwogICAgY2IudHlwZT0nY2hlY2tib3gnOwogICAgY2IuY2hlY2tlZD0hIXNldHRpbmdzW2tleV07CiAgICBjYi5zdHlsZS5jc3NUZXh0PSd3aWR0aDoxNnB4O2hlaWdodDoxNnB4O2FjY2VudC1jb2xvcjojN2M5ZWZmO2N1cnNvcjpwb2ludGVyOyc7CiAgICBjYi5vbmNoYW5nZT1mdW5jdGlvbigpewogICAgICBzZXR0aW5nc1trZXldPWNiLmNoZWNrZWQ7CiAgICAgIHNhdmVTZXR0aW5ncyhzZXR0aW5ncyk7CiAgICAgIGFwcGx5U2V0dGluZ3NTaWRlRWZmZWN0cygpOwogICAgfTsKICAgIHJvdy5hcHBlbmRDaGlsZChzcGFuKTtyb3cuYXBwZW5kQ2hpbGQoY2IpOwogICAgcmV0dXJuIHJvdzsKICB9CgogIGZ1bmN0aW9uIGFwcGx5U2V0dGluZ3NTaWRlRWZmZWN0cygpewogICAgY29tcGFjdD1zZXR0aW5ncy5jb21wYWN0OwogICAgYXBwbHlTaXplKCk7CiAgICBpZighc2V0dGluZ3Mudm9pY2VJbnB1dHx8IVNwZWVjaFJlYyl7bWljQnRuLnN0eWxlLmRpc3BsYXk9J25vbmUnO31lbHNle21pY0J0bi5zdHlsZS5kaXNwbGF5PSdpbmxpbmUtYmxvY2snO30KICAgIGlmKCFzZXR0aW5ncy5zaG93Q29zdCl7Y29zdEJhci5zdHlsZS5kaXNwbGF5PSdub25lJzt9CiAgfQoKICBmdW5jdGlvbiBidWlsZFNldHRpbmdzVmlldygpewogICAgc2V0dGluZ3NWaWV3LmlubmVySFRNTD0nJzsKCiAgICB2YXIgYmFja0J0bj1kb2N1bWVudC5jcmVhdGVFbGVtZW50KCdidXR0b24nKTsKICAgIGJhY2tCdG4udGV4dENvbnRlbnQ9J+KGkCBiYWNrIHRvIGNoYXQnOwogICAgYmFja0J0bi5zdHlsZS5jc3NUZXh0PSdiYWNrZ3JvdW5kOm5vbmU7Ym9yZGVyOm5vbmU7Y29sb3I6IzdjOWVmZjtmb250LXNpemU6MTIuNXB4O2N1cnNvcjpwb2ludGVyO3BhZGRpbmc6MCAwIDE0cHg7dGV4dC1hbGlnbjpsZWZ0Oyc7CiAgICBiYWNrQnRuLm9uY2xpY2s9ZnVuY3Rpb24oKXsKICAgICAgc2V0dGluZ3NWaWV3LnN0eWxlLmRpc3BsYXk9J25vbmUnOwogICAgICBjaGF0Vmlldy5zdHlsZS5kaXNwbGF5PSdmbGV4JzsKICAgIH07CiAgICBzZXR0aW5nc1ZpZXcuYXBwZW5kQ2hpbGQoYmFja0J0bik7CgogICAgLy8gQVBJIGtleQogICAgdmFyIGtleUlucHV0PWRvY3VtZW50LmNyZWF0ZUVsZW1lbnQoJ2lucHV0Jyk7CiAgICBrZXlJbnB1dC50eXBlPSdwYXNzd29yZCc7CiAgICBrZXlJbnB1dC52YWx1ZT1hcGlLZXl8fCcnOwogICAga2V5SW5wdXQuc3R5bGUuY3NzVGV4dD0nd2lkdGg6MTAwJTtwYWRkaW5nOjhweDtib3JkZXItcmFkaXVzOjZweDtib3JkZXI6MXB4IHNvbGlkICMyYTJiMzM7YmFja2dyb3VuZDojMGEwYjBmO2NvbG9yOiNlOWU5ZWY7Zm9udC1mYW1pbHk6bW9ub3NwYWNlO2ZvbnQtc2l6ZToxMS41cHg7JzsKICAgIGtleUlucHV0Lm9uY2hhbmdlPWZ1bmN0aW9uKCl7CiAgICAgIGFwaUtleT1rZXlJbnB1dC52YWx1ZS50cmltKCk7CiAgICAgIGxvY2FsU3RvcmFnZS5zZXRJdGVtKCdjbGFzc2dwdF9hcGlfa2V5JyxhcGlLZXkpOwogICAgfTsKICAgIHNldHRpbmdzVmlldy5hcHBlbmRDaGlsZChmaWVsZFJvdygnT3BlblJvdXRlciBBUEkga2V5JyxrZXlJbnB1dCkpOwoKICAgIC8vIG1vZGVsIGRyb3Bkb3duCiAgICB2YXIgbW9kZWxTZWxlY3Q9ZG9jdW1lbnQuY3JlYXRlRWxlbWVudCgnc2VsZWN0Jyk7CiAgICBtb2RlbFNlbGVjdC5zdHlsZS5jc3NUZXh0PSd3aWR0aDoxMDAlO3BhZGRpbmc6OHB4O2JvcmRlci1yYWRpdXM6NnB4O2JvcmRlcjoxcHggc29saWQgIzJhMmIzMztiYWNrZ3JvdW5kOiMwYTBiMGY7Y29sb3I6I2U5ZTllZjtmb250LXNpemU6MTIuNXB4Oyc7CiAgICBNT0RFTF9QUkVTRVRTLmZvckVhY2goZnVuY3Rpb24ocCl7CiAgICAgIHZhciBvcHQ9ZG9jdW1lbnQuY3JlYXRlRWxlbWVudCgnb3B0aW9uJyk7CiAgICAgIG9wdC52YWx1ZT1wLmlkO29wdC50ZXh0Q29udGVudD1wLmxhYmVsOwogICAgICBpZihwLmlkPT09c2V0dGluZ3MubW9kZWwpb3B0LnNlbGVjdGVkPXRydWU7CiAgICAgIG1vZGVsU2VsZWN0LmFwcGVuZENoaWxkKG9wdCk7CiAgICB9KTsKICAgIHZhciBjdXN0b21XcmFwPWRvY3VtZW50LmNyZWF0ZUVsZW1lbnQoJ2RpdicpOwogICAgY3VzdG9tV3JhcC5zdHlsZS5jc3NUZXh0PSdtYXJnaW4tdG9wOjhweDsnKyhzZXR0aW5ncy5tb2RlbD09PSdjdXN0b20nPycnOidkaXNwbGF5Om5vbmU7Jyk7CiAgICB2YXIgY3VzdG9tSW5wdXQ9ZG9jdW1lbnQuY3JlYXRlRWxlbWVudCgnaW5wdXQnKTsKICAgIGN1c3RvbUlucHV0LnBsYWNlaG9sZGVyPSdwcm92aWRlci9tb2RlbC1pZCc7CiAgICBjdXN0b21JbnB1dC52YWx1ZT1zZXR0aW5ncy5jdXN0b21Nb2RlbHx8Jyc7CiAgICBjdXN0b21JbnB1dC5zdHlsZS5jc3NUZXh0PSd3aWR0aDoxMDAlO3BhZGRpbmc6OHB4O2JvcmRlci1yYWRpdXM6NnB4O2JvcmRlcjoxcHggc29saWQgIzJhMmIzMztiYWNrZ3JvdW5kOiMwYTBiMGY7Y29sb3I6I2U5ZTllZjtmb250LWZhbWlseTptb25vc3BhY2U7Zm9udC1zaXplOjExLjVweDsnOwogICAgY3VzdG9tSW5wdXQub25jaGFuZ2U9ZnVuY3Rpb24oKXsKICAgICAgc2V0dGluZ3MuY3VzdG9tTW9kZWw9Y3VzdG9tSW5wdXQudmFsdWUudHJpbSgpOwogICAgICBzYXZlU2V0dGluZ3Moc2V0dGluZ3MpOwogICAgfTsKICAgIGN1c3RvbVdyYXAuYXBwZW5kQ2hpbGQoY3VzdG9tSW5wdXQpOwogICAgbW9kZWxTZWxlY3Qub25jaGFuZ2U9ZnVuY3Rpb24oKXsKICAgICAgc2V0dGluZ3MubW9kZWw9bW9kZWxTZWxlY3QudmFsdWU7CiAgICAgIHNhdmVTZXR0aW5ncyhzZXR0aW5ncyk7CiAgICAgIGN1c3RvbVdyYXAuc3R5bGUuZGlzcGxheT1zZXR0aW5ncy5tb2RlbD09PSdjdXN0b20nPydibG9jayc6J25vbmUnOwogICAgfTsKICAgIHZhciBtb2RlbFdyYXA9ZG9jdW1lbnQuY3JlYXRlRWxlbWVudCgnZGl2Jyk7CiAgICBtb2RlbFdyYXAuYXBwZW5kQ2hpbGQobW9kZWxTZWxlY3QpOwogICAgbW9kZWxXcmFwLmFwcGVuZENoaWxkKGN1c3RvbVdyYXApOwogICAgc2V0dGluZ3NWaWV3LmFwcGVuZENoaWxkKGZpZWxkUm93KCdNb2RlbCcsbW9kZWxXcmFwKSk7CgogICAgLy8gZmVhdHVyZSB0b2dnbGVzCiAgICB2YXIgdG9nZ2xlc0hlYWRlcj1kb2N1bWVudC5jcmVhdGVFbGVtZW50KCdkaXYnKTsKICAgIHRvZ2dsZXNIZWFkZXIudGV4dENvbnRlbnQ9J0ZlYXR1cmVzJzsKICAgIHRvZ2dsZXNIZWFkZXIuc3R5bGUuY3NzVGV4dD0nZm9udC1zaXplOjExcHg7Y29sb3I6IzhhOGI5NjttYXJnaW46MTZweCAwIDRweDt0ZXh0LXRyYW5zZm9ybTp1cHBlcmNhc2U7bGV0dGVyLXNwYWNpbmc6LjNweDsnOwogICAgc2V0dGluZ3NWaWV3LmFwcGVuZENoaWxkKHRvZ2dsZXNIZWFkZXIpOwoKICAgIHNldHRpbmdzVmlldy5hcHBlbmRDaGlsZCh0b2dnbGVSb3coJ01hcmtkb3duIHJlbmRlcmluZycsJ21hcmtkb3duJykpOwogICAgc2V0dGluZ3NWaWV3LmFwcGVuZENoaWxkKHRvZ2dsZVJvdygnUmVtZW1iZXIgY2hhdCBvbiB0aGlzIHNpdGUnLCdyZW1lbWJlckhpc3RvcnknKSk7CiAgICBzZXR0aW5nc1ZpZXcuYXBwZW5kQ2hpbGQodG9nZ2xlUm93KCdSZW1lbWJlciB3aWRnZXQgcG9zaXRpb24nLCdyZW1lbWJlclBvc2l0aW9uJykpOwogICAgc2V0dGluZ3NWaWV3LmFwcGVuZENoaWxkKHRvZ2dsZVJvdygnU2hvdyB0b2tlbi9jb3N0IGVzdGltYXRlJywnc2hvd0Nvc3QnKSk7CiAgICBzZXR0aW5nc1ZpZXcuYXBwZW5kQ2hpbGQodG9nZ2xlUm93KCdBbGxvdyAiaW5zZXJ0IGludG8gcGFnZSInLCdhbGxvd0luc2VydCcpKTsKICAgIHNldHRpbmdzVmlldy5hcHBlbmRDaGlsZCh0b2dnbGVSb3coJ0NvbXBhY3Qgc2l6ZScsJ2NvbXBhY3QnKSk7CiAgICBzZXR0aW5nc1ZpZXcuYXBwZW5kQ2hpbGQodG9nZ2xlUm93KCdWb2ljZSBpbnB1dCAobWljIGJ1dHRvbiknLCd2b2ljZUlucHV0JykpOwogICAgc2V0dGluZ3NWaWV3LmFwcGVuZENoaWxkKHRvZ2dsZVJvdygnQ3RybCtTaGlmdCtHIHRvIHNob3cvaGlkZScsJ2tleWJvYXJkU2hvcnRjdXQnKSk7CgogICAgLy8gZXhwb3J0CiAgICB2YXIgZXhwb3J0QnRuPWRvY3VtZW50LmNyZWF0ZUVsZW1lbnQoJ2J1dHRvbicpOwogICAgZXhwb3J0QnRuLnRleHRDb250ZW50PSdFeHBvcnQgdGhpcyBjaGF0ICgudHh0KSc7CiAgICBleHBvcnRCdG4uc3R5bGUuY3NzVGV4dD0nd2lkdGg6MTAwJTttYXJnaW4tdG9wOjE2cHg7cGFkZGluZzo5cHg7Ym9yZGVyLXJhZGl1czo4cHg7Ym9yZGVyOjFweCBzb2xpZCAjMmEyYjMzO2JhY2tncm91bmQ6IzE5MWEyMTtjb2xvcjojZTllOWVmO2N1cnNvcjpwb2ludGVyO2ZvbnQtc2l6ZToxMnB4Oyc7CiAgICBleHBvcnRCdG4ub25jbGljaz1mdW5jdGlvbigpewogICAgICB2YXIgbGluZXM9bWVzc2FnZXMuZmlsdGVyKGZ1bmN0aW9uKG0pe3JldHVybiBtLnJvbGUhPT0nc3lzdGVtJzt9KS5tYXAoZnVuY3Rpb24obSl7CiAgICAgICAgcmV0dXJuIChtLnJvbGU9PT0ndXNlcic/J1lvdTogJzonQ2xhc3NHUFQ6ICcpK20uY29udGVudDsKICAgICAgfSk7CiAgICAgIHZhciBibG9iPW5ldyBCbG9iKFtsaW5lcy5qb2luKCdcblxuJyldLHt0eXBlOid0ZXh0L3BsYWluJ30pOwogICAgICB2YXIgYT1kb2N1bWVudC5jcmVhdGVFbGVtZW50KCdhJyk7CiAgICAgIGEuaHJlZj1VUkwuY3JlYXRlT2JqZWN0VVJMKGJsb2IpOwogICAgICBhLmRvd25sb2FkPSdjbGFzc2dwdC1jaGF0LnR4dCc7CiAgICAgIGEuY2xpY2soKTsKICAgIH07CiAgICBzZXR0aW5nc1ZpZXcuYXBwZW5kQ2hpbGQoZXhwb3J0QnRuKTsKCiAgICB2YXIgY2xlYXJIaXN0QnRuPWRvY3VtZW50LmNyZWF0ZUVsZW1lbnQoJ2J1dHRvbicpOwogICAgY2xlYXJIaXN0QnRuLnRleHRDb250ZW50PSdDbGVhciBzYXZlZCBoaXN0b3J5IGZvciB0aGlzIHNpdGUnOwogICAgY2xlYXJIaXN0QnRuLnN0eWxlLmNzc1RleHQ9J3dpZHRoOjEwMCU7bWFyZ2luLXRvcDo4cHg7cGFkZGluZzo5cHg7Ym9yZGVyLXJhZGl1czo4cHg7Ym9yZGVyOjFweCBzb2xpZCAjMmEyYjMzO2JhY2tncm91bmQ6IzE5MWEyMTtjb2xvcjojOGE4Yjk2O2N1cnNvcjpwb2ludGVyO2ZvbnQtc2l6ZToxMnB4Oyc7CiAgICBjbGVhckhpc3RCdG4ub25jbGljaz1mdW5jdGlvbigpewogICAgICBsb2NhbFN0b3JhZ2UucmVtb3ZlSXRlbShoaXN0b3J5S2V5KTsKICAgICAgY2xlYXJIaXN0QnRuLnRleHRDb250ZW50PSdjbGVhcmVkJzsKICAgICAgc2V0VGltZW91dChmdW5jdGlvbigpe2NsZWFySGlzdEJ0bi50ZXh0Q29udGVudD0nQ2xlYXIgc2F2ZWQgaGlzdG9yeSBmb3IgdGhpcyBzaXRlJzt9LDEyMDApOwogICAgfTsKICAgIHNldHRpbmdzVmlldy5hcHBlbmRDaGlsZChjbGVhckhpc3RCdG4pOwogIH0KCiAgZG9jdW1lbnQuZ2V0RWxlbWVudEJ5SWQoJ2NnLXNldHRpbmdzLWJ0bicpLm9uY2xpY2s9ZnVuY3Rpb24oKXsKICAgIGJ1aWxkU2V0dGluZ3NWaWV3KCk7CiAgICBjaGF0Vmlldy5zdHlsZS5kaXNwbGF5PSdub25lJzsKICAgIHNldHRpbmdzVmlldy5zdHlsZS5kaXNwbGF5PSdmbGV4JzsKICB9OwoKICBhcHBseVNldHRpbmdzU2lkZUVmZmVjdHMoKTsKICBkb2N1bWVudC5nZXRFbGVtZW50QnlJZCgnY2ctaW5wdXQnKS5mb2N1cygpOwp9KSgpOwo=";
+function decodeTemplate(){
+  return decodeURIComponent(escape(atob(WIDGET_B64)));
+}
+function buildBookmarklet(key){
+  var tmpl = decodeTemplate();
+  var withKey = tmpl.replace('__API_KEY__', key ? key.replace(/'/g,"\\'") : '__API_KEY__');
+  return 'javascript:' + encodeURIComponent(withKey);
+}
+
+var keyInput = document.getElementById('key-input');
+var buildBtn = document.getElementById('key-build');
+var status = document.getElementById('key-status');
+var mainLink = document.getElementById('main-bookmarklet');
+var rawCode = document.getElementById('raw-code');
+
+buildBtn.addEventListener('click', function(){
+  var key = keyInput.value.trim();
+  if(!key){
+    status.textContent = 'paste a key first';
+    status.className = 'key-status';
+    return;
+  }
+  var link = buildBookmarklet(key);
+  mainLink.href = link;
+  rawCode.textContent = link;
+  status.textContent = '✓ key baked in — drag the button below now';
+  status.className = 'key-status ready';
+});
+
+document.getElementById('try-it').addEventListener('click', function(){
+(function(){
+  var EXISTING=document.getElementById('classgpt-widget');
+  if(EXISTING){
+    EXISTING.style.display = EXISTING.style.display==='none' ? 'flex' : 'none';
+    return;
+  }
+
+  var SETTINGS_KEY='classgpt_settings';
+  var HISTORY_PREFIX='classgpt_history_';
+  var POSITION_KEY='classgpt_position';
+  var BAKED_KEY='__API_KEY__';
+
+  var MODEL_PRESETS=[
+    {id:'openai/gpt-4o-mini',label:'GPT-4o mini (default)',price:0.15},
+    {id:'openai/gpt-4o',label:'GPT-4o',price:2.5},
+    {id:'anthropic/claude-3.5-haiku',label:'Claude 3.5 Haiku',price:0.8},
+    {id:'anthropic/claude-3.5-sonnet',label:'Claude 3.5 Sonnet',price:3},
+    {id:'google/gemini-2.0-flash-001',label:'Gemini 2.0 Flash',price:0.1},
+    {id:'custom',label:'Custom model id...',price:null}
+  ];
+
+  var DEFAULT_SETTINGS={
+    model:'openai/gpt-4o-mini',
+    customModel:'',
+    markdown:true,
+    rememberHistory:false,
+    rememberPosition:false,
+    showCost:true,
+    allowInsert:true,
+    compact:false,
+    voiceInput:true,
+    keyboardShortcut:true
+  };
+
+  function loadSettings(){
+    try{
+      var raw=localStorage.getItem(SETTINGS_KEY);
+      if(!raw)return Object.assign({},DEFAULT_SETTINGS);
+      var parsed=JSON.parse(raw);
+      return Object.assign({},DEFAULT_SETTINGS,parsed);
+    }catch(e){return Object.assign({},DEFAULT_SETTINGS);}
+  }
+  function saveSettings(s){
+    localStorage.setItem(SETTINGS_KEY,JSON.stringify(s));
+  }
+
+  var settings=loadSettings();
+  var apiKey=(BAKED_KEY&&BAKED_KEY.indexOf('API_KEY')===-1)?BAKED_KEY:localStorage.getItem('classgpt_api_key');
+  if(!apiKey){
+    apiKey=prompt('Paste your OpenRouter API key (get one free at openrouter.ai/keys):');
+    if(!apiKey)return;
+    localStorage.setItem('classgpt_api_key',apiKey);
+  }else if(!localStorage.getItem('classgpt_api_key')){
+    localStorage.setItem('classgpt_api_key',apiKey);
+  }
+
+  function activeModel(){
+    return settings.model==='custom' ? (settings.customModel||'openai/gpt-4o-mini') : settings.model;
+  }
+
+  var pageContext=null;
+  var compact=settings.compact;
+
+  var box=document.createElement('div');
+  box.id='classgpt-widget';
+  function boxSize(){
+    return compact ? {w:280,h:380} : {w:340,h:520};
+  }
+  function applySize(){
+    var sz=boxSize();
+    box.style.width=sz.w+'px';
+    box.style.height=sz.h+'px';
+  }
+  box.style.cssText='position:fixed;bottom:20px;right:20px;background:#14151a;color:#e9e9ef;border-radius:14px;box-shadow:0 12px 40px rgba(0,0,0,.5);z-index:2147483647;display:flex;flex-direction:column;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;overflow:hidden;border:1px solid #2a2b33;';
+  applySize();
+
+  if(settings.rememberPosition){
+    try{
+      var pos=JSON.parse(localStorage.getItem(POSITION_KEY)||'null');
+      if(pos&&pos.left&&pos.top){
+        box.style.left=pos.left;box.style.top=pos.top;
+        box.style.right='auto';box.style.bottom='auto';
+      }
+    }catch(e){}
+  }
+
+  box.innerHTML=
+    '<div id="cg-header" style="padding:10px 12px;background:#1c1d24;cursor:move;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #2a2b33;flex-shrink:0;">'+
+      '<span style="font-weight:700;letter-spacing:.2px;font-size:14px;">Class<span style="color:#7c9eff;">GPT</span></span>'+
+      '<span style="display:flex;gap:10px;align-items:center;">'+
+        '<span id="cg-settings-btn" title="Settings" style="cursor:pointer;opacity:.7;font-size:14px;">&#9881;</span>'+
+        '<span id="cg-close" title="Close" style="cursor:pointer;opacity:.7;font-size:15px;">&#10005;</span>'+
+      '</span>'+
+    '</div>'+
+    '<div id="cg-view-chat" style="display:flex;flex-direction:column;flex:1;min-height:0;">'+
+      '<div id="cg-messages" style="flex:1;overflow-y:auto;padding:12px;font-size:13.5px;line-height:1.45;"></div>'+
+      '<div id="cg-context-bar" style="display:none;padding:6px 12px;background:#1c1d24;border-top:1px solid #2a2b33;font-size:11.5px;color:#8a8b96;align-items:center;justify-content:space-between;"></div>'+
+      '<div id="cg-cost-bar" style="display:none;padding:4px 12px;font-size:10.5px;color:#5f606a;font-family:monospace;"></div>'+
+      '<div style="display:flex;gap:6px;padding:10px;border-top:1px solid #2a2b33;background:#17181f;flex-shrink:0;">'+
+        '<button id="cg-readpage" title="Read this page" style="padding:8px 9px;border-radius:8px;border:1px solid #2a2b33;background:#0f1015;color:#e9e9ef;cursor:pointer;font-size:13px;">&#128196;</button>'+
+        '<button id="cg-mic" title="Voice input" style="padding:8px 9px;border-radius:8px;border:1px solid #2a2b33;background:#0f1015;color:#e9e9ef;cursor:pointer;font-size:13px;">&#127908;</button>'+
+        '<input id="cg-input" style="flex:1;padding:8px 10px;border-radius:8px;border:1px solid #2a2b33;background:#0f1015;color:#e9e9ef;outline:none;font-size:13px;min-width:0;" placeholder="Ask ClassGPT...">'+
+        '<button id="cg-send" style="padding:8px 12px;border-radius:8px;border:none;background:#7c9eff;color:#0f1015;font-weight:700;cursor:pointer;">Go</button>'+
+      '</div>'+
+    '</div>'+
+    '<div id="cg-view-settings" style="display:none;flex-direction:column;flex:1;min-height:0;overflow-y:auto;padding:14px;font-size:12.5px;"></div>';
+
+  document.body.appendChild(box);
+
+  document.getElementById('cg-close').onclick=function(){box.remove();};
+
+  // dragging
+  var drag=false,ox=0,oy=0;
+  var header=document.getElementById('cg-header');
+  header.onmousedown=function(e){
+    if(e.target.id==='cg-settings-btn'||e.target.id==='cg-close')return;
+    drag=true;
+    var r=box.getBoundingClientRect();
+    ox=e.clientX-r.left;oy=e.clientY-r.top;
+    box.style.right='auto';box.style.bottom='auto';
+    box.style.left=r.left+'px';box.style.top=r.top+'px';
+  };
+  document.addEventListener('mousemove',function(e){
+    if(drag){box.style.left=(e.clientX-ox)+'px';box.style.top=(e.clientY-oy)+'px';}
+  });
+  document.addEventListener('mouseup',function(){
+    if(drag&&settings.rememberPosition){
+      localStorage.setItem(POSITION_KEY,JSON.stringify({left:box.style.left,top:box.style.top}));
+    }
+    drag=false;
+  });
+
+  // keyboard shortcut: Ctrl+Shift+G toggles visibility
+  function shortcutHandler(e){
+    if(!settings.keyboardShortcut)return;
+    if(e.ctrlKey&&e.shiftKey&&(e.key==='G'||e.key==='g')){
+      e.preventDefault();
+      box.style.display = box.style.display==='none' ? 'flex' : 'none';
+    }
+  }
+  document.addEventListener('keydown',shortcutHandler);
+
+  // --- track last typable field outside widget ---
+  var lastFocusedEl=null;
+  function isTypableField(el){
+    if(!el)return false;
+    if(box.contains(el))return false;
+    var tag=el.tagName;
+    if(tag==='TEXTAREA')return true;
+    if(tag==='INPUT'){
+      var t=(el.getAttribute('type')||'text').toLowerCase();
+      return ['text','search','email','url','tel'].indexOf(t)!==-1;
+    }
+    if(el.isContentEditable)return true;
+    return false;
+  }
+  document.addEventListener('focusin',function(e){
+    if(isTypableField(e.target))lastFocusedEl=e.target;
+  },true);
+
+  function insertIntoField(el,text){
+    if(!el)return false;
+    if(el.tagName==='TEXTAREA'||el.tagName==='INPUT'){
+      var start=el.selectionStart==null?el.value.length:el.selectionStart;
+      var end=el.selectionEnd==null?el.value.length:el.selectionEnd;
+      el.value=el.value.slice(0,start)+text+el.value.slice(end);
+      var pos=start+text.length;
+      el.setSelectionRange(pos,pos);
+      el.dispatchEvent(new Event('input',{bubbles:true}));
+      el.focus();
+      return true;
+    }
+    if(el.isContentEditable){
+      el.focus();
+      var sel=window.getSelection();
+      if(sel&&sel.rangeCount>0){
+        var range=sel.getRangeAt(0);
+        range.deleteContents();
+        range.insertNode(document.createTextNode(text));
+        range.collapse(false);
+      }else{
+        el.textContent+=text;
+      }
+      el.dispatchEvent(new Event('input',{bubbles:true}));
+      return true;
+    }
+    return false;
+  }
+
+  // --- minimal markdown renderer (bold, italics, inline code, code blocks, line breaks) ---
+  function escapeHtml(s){
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+  function renderMarkdown(text){
+    var escaped=escapeHtml(text);
+    escaped=escaped.replace(/```([\s\S]*?)```/g,function(m,code){
+      return '<pre style="background:#0a0b0f;border:1px solid #2a2b33;border-radius:6px;padding:8px;overflow-x:auto;margin:6px 0;"><code style="font-family:JetBrains Mono,monospace;font-size:11.5px;">'+code.trim()+'</code></pre>';
+    });
+    escaped=escaped.replace(/`([^`]+)`/g,'<code style="background:#0a0b0f;padding:1px 5px;border-radius:4px;font-family:JetBrains Mono,monospace;font-size:12px;">$1</code>');
+    escaped=escaped.replace(/\*\*([^*]+)\*\*/g,'<strong>$1</strong>');
+    escaped=escaped.replace(/\*([^*]+)\*/g,'<em>$1</em>');
+    escaped=escaped.replace(/\n/g,'<br>');
+    return escaped;
+  }
+
+  var hostname=location.hostname||'page';
+  var historyKey=HISTORY_PREFIX+hostname;
+  var systemPrompt='You are ClassGPT, a concise, helpful assistant embedded as a floating widget on a webpage. When the user has shared the page content with you, use it to answer questions, explain things, or summarize — but never just produce finished answers to graded assignments, quizzes, or homework problems on their behalf; instead help them understand the material. The user may draft messages (replies, notes, snippets) that they write themselves into a text field on the page using an insert button you provide — that is their own composed text, not you answering questions for them.';
+  var messages=[{role:'system',content:systemPrompt}];
+
+  var msgBox=document.getElementById('cg-messages');
+  var contextBar=document.getElementById('cg-context-bar');
+  var costBar=document.getElementById('cg-cost-bar');
+
+  function renderMsgBody(container,text){
+    if(settings.markdown){
+      container.innerHTML=renderMarkdown(text);
+    }else{
+      container.textContent=text;
+      container.style.whiteSpace='pre-wrap';
+    }
+  }
+
+  function addMsg(role,text){
+    var d=document.createElement('div');
+    d.style.margin='0 0 10px 0';
+    var who=document.createElement('div');
+    who.style.cssText='font-size:11px;font-weight:700;opacity:.55;margin-bottom:2px;text-transform:uppercase;letter-spacing:.4px;';
+    who.textContent=role==='user'?'You':'ClassGPT';
+    var body=document.createElement('div');
+    renderMsgBody(body,text);
+    d.appendChild(who);d.appendChild(body);
+
+    if(role==='assistant'){
+      var actions=document.createElement('div');
+      actions.style.cssText='display:flex;gap:8px;margin-top:6px;flex-wrap:wrap;';
+      var copyBtn=document.createElement('button');
+      copyBtn.textContent='copy';
+      copyBtn.style.cssText='font-size:11px;padding:4px 8px;border-radius:6px;border:1px solid #2a2b33;background:#191a21;color:#8a8b96;cursor:pointer;';
+      copyBtn.onclick=function(){
+        navigator.clipboard.writeText(text).then(function(){
+          copyBtn.textContent='copied';
+          setTimeout(function(){copyBtn.textContent='copy';},1200);
+        });
+      };
+      actions.appendChild(copyBtn);
+      if(settings.allowInsert){
+        var insertBtn=document.createElement('button');
+        insertBtn.textContent='insert into page';
+        insertBtn.style.cssText='font-size:11px;padding:4px 8px;border-radius:6px;border:1px solid #2a2b33;background:#191a21;color:#8a8b96;cursor:pointer;';
+        insertBtn.onclick=function(){
+          if(!lastFocusedEl){
+            insertBtn.textContent='click a text box on the page first';
+            setTimeout(function(){insertBtn.textContent='insert into page';},1800);
+            return;
+          }
+          var ok=insertIntoField(lastFocusedEl,text);
+          insertBtn.textContent=ok?'inserted':'failed';
+          setTimeout(function(){insertBtn.textContent='insert into page';},1200);
+        };
+        actions.appendChild(insertBtn);
+      }
+      d.appendChild(actions);
+    }
+
+    msgBox.appendChild(d);
+    msgBox.scrollTop=msgBox.scrollHeight;
+    return body;
+  }
+
+  // load history if enabled
+  if(settings.rememberHistory){
+    try{
+      var savedHist=JSON.parse(localStorage.getItem(historyKey)||'null');
+      if(savedHist&&savedHist.length){
+        savedHist.forEach(function(m){
+          messages.push(m);
+          addMsg(m.role,m.content);
+        });
+      }
+    }catch(e){}
+  }
+
+  function persistHistory(){
+    if(!settings.rememberHistory)return;
+    var toSave=messages.filter(function(m){return m.role!=='system';}).slice(-40);
+    localStorage.setItem(historyKey,JSON.stringify(toSave));
+  }
+
+  function extractPageText(){
+    var clone=document.body.cloneNode(true);
+    var kill=clone.querySelectorAll('#classgpt-widget,script,style,noscript,svg,iframe');
+    kill.forEach(function(el){el.remove();});
+    var text=clone.innerText||clone.textContent||'';
+    text=text.replace(/\n{3,}/g,'\n\n').replace(/[ \t]{2,}/g,' ').trim();
+    var MAXLEN=12000;
+    if(text.length>MAXLEN){text=text.slice(0,MAXLEN)+'\n\n[...page truncated...]';}
+    return text;
+  }
+
+  document.getElementById('cg-readpage').onclick=function(){
+    var text=extractPageText();
+    if(!text){addMsg('assistant',"Couldn't find readable text on this page.");return;}
+    pageContext=text;
+    contextBar.style.display='flex';
+    contextBar.innerHTML='<span>&#128196; page loaded ('+text.length+' chars)</span><span id="cg-clear-ctx" style="cursor:pointer;color:#7c9eff;">clear</span>';
+    document.getElementById('cg-clear-ctx').onclick=function(){
+      pageContext=null;
+      contextBar.style.display='none';
+    };
+    addMsg('assistant','Got the page — ask me anything about it (summarize it, explain a part, define a term, etc).');
+  };
+
+  // voice input
+  var recognizing=false;
+  var SpeechRec=window.SpeechRecognition||window.webkitSpeechRecognition;
+  var micBtn=document.getElementById('cg-mic');
+  if(!settings.voiceInput||!SpeechRec){
+    micBtn.style.display='none';
+  }else{
+    var recognition=new SpeechRec();
+    recognition.continuous=false;
+    recognition.interimResults=false;
+    recognition.onresult=function(e){
+      var transcript=e.results[0][0].transcript;
+      var input=document.getElementById('cg-input');
+      input.value=(input.value?input.value+' ':'')+transcript;
+    };
+    recognition.onend=function(){recognizing=false;micBtn.style.opacity='.7';};
+    micBtn.onclick=function(){
+      if(recognizing)return;
+      recognizing=true;
+      micBtn.style.opacity='1';
+      try{recognition.start();}catch(e){recognizing=false;}
+    };
+  }
+
+  // rough cost estimate (very approximate, $ per 1M input tokens, heuristic 4 chars/token)
+  function estimateCost(){
+    var preset=MODEL_PRESETS.find(function(p){return p.id===settings.model;});
+    if(!preset||preset.price==null){costBar.style.display='none';return;}
+    var totalChars=messages.reduce(function(a,m){return a+(m.content?m.content.length:0);},0);
+    var tokens=Math.round(totalChars/4);
+    var cost=(tokens/1000000)*preset.price;
+    costBar.style.display='block';
+    costBar.textContent='~'+tokens+' tokens this session · ~$'+cost.toFixed(4)+' est.';
+  }
+
+  async function send(){
+    var input=document.getElementById('cg-input');
+    var text=input.value.trim();
+    if(!text)return;
+    input.value='';
+    addMsg('user',text);
+
+    var outgoing=messages.slice();
+    if(pageContext){
+      outgoing.push({role:'system',content:'Content of the current webpage (title: '+document.title+', url: '+location.href+'):\n\n'+pageContext});
+    }
+    messages.push({role:'user',content:text});
+    outgoing.push({role:'user',content:text});
+    persistHistory();
+    if(settings.showCost)estimateCost();
+
+    var thinking=addMsg('assistant','...');
+    try{
+      var res=await fetch('https://openrouter.ai/api/v1/chat/completions',{
+        method:'POST',
+        headers:{
+          'Content-Type':'application/json',
+          'Authorization':'Bearer '+apiKey,
+          'HTTP-Referer':location.href,
+          'X-Title':'ClassGPT'
+        },
+        body:JSON.stringify({model:activeModel(),messages:outgoing})
+      });
+      var data=await res.json();
+      if(data.error){
+        renderMsgBody(thinking,'Error: '+data.error.message);
+        return;
+      }
+      var reply=(data.choices&&data.choices[0]&&data.choices[0].message&&data.choices[0].message.content)||'No response.';
+      renderMsgBody(thinking,reply);
+      messages.push({role:'assistant',content:reply});
+      persistHistory();
+      if(settings.showCost)estimateCost();
+    }catch(e){
+      renderMsgBody(thinking,'Error: '+e.message);
+    }
+  }
+  document.getElementById('cg-send').onclick=send;
+  document.getElementById('cg-input').addEventListener('keydown',function(e){
+    if(e.key==='Enter')send();
+  });
+
+  // ===== settings panel =====
+  var chatView=document.getElementById('cg-view-chat');
+  var settingsView=document.getElementById('cg-view-settings');
+
+  function fieldRow(labelText,inputEl){
+    var row=document.createElement('div');
+    row.style.cssText='margin-bottom:14px;';
+    var label=document.createElement('div');
+    label.textContent=labelText;
+    label.style.cssText='font-size:11px;color:#8a8b96;margin-bottom:5px;text-transform:uppercase;letter-spacing:.3px;';
+    row.appendChild(label);
+    row.appendChild(inputEl);
+    return row;
+  }
+  function toggleRow(labelText,key){
+    var row=document.createElement('label');
+    row.style.cssText='display:flex;align-items:center;justify-content:space-between;padding:9px 0;border-bottom:1px solid #22232b;cursor:pointer;font-size:12.5px;';
+    var span=document.createElement('span');
+    span.textContent=labelText;
+    var cb=document.createElement('input');
+    cb.type='checkbox';
+    cb.checked=!!settings[key];
+    cb.style.cssText='width:16px;height:16px;accent-color:#7c9eff;cursor:pointer;';
+    cb.onchange=function(){
+      settings[key]=cb.checked;
+      saveSettings(settings);
+      applySettingsSideEffects();
+    };
+    row.appendChild(span);row.appendChild(cb);
+    return row;
+  }
+
+  function applySettingsSideEffects(){
+    compact=settings.compact;
+    applySize();
+    if(!settings.voiceInput||!SpeechRec){micBtn.style.display='none';}else{micBtn.style.display='inline-block';}
+    if(!settings.showCost){costBar.style.display='none';}
+  }
+
+  function buildSettingsView(){
+    settingsView.innerHTML='';
+
+    var backBtn=document.createElement('button');
+    backBtn.textContent='← back to chat';
+    backBtn.style.cssText='background:none;border:none;color:#7c9eff;font-size:12.5px;cursor:pointer;padding:0 0 14px;text-align:left;';
+    backBtn.onclick=function(){
+      settingsView.style.display='none';
+      chatView.style.display='flex';
+    };
+    settingsView.appendChild(backBtn);
+
+    // API key
+    var keyInput=document.createElement('input');
+    keyInput.type='password';
+    keyInput.value=apiKey||'';
+    keyInput.style.cssText='width:100%;padding:8px;border-radius:6px;border:1px solid #2a2b33;background:#0a0b0f;color:#e9e9ef;font-family:monospace;font-size:11.5px;';
+    keyInput.onchange=function(){
+      apiKey=keyInput.value.trim();
+      localStorage.setItem('classgpt_api_key',apiKey);
+    };
+    settingsView.appendChild(fieldRow('OpenRouter API key',keyInput));
+
+    // model dropdown
+    var modelSelect=document.createElement('select');
+    modelSelect.style.cssText='width:100%;padding:8px;border-radius:6px;border:1px solid #2a2b33;background:#0a0b0f;color:#e9e9ef;font-size:12.5px;';
+    MODEL_PRESETS.forEach(function(p){
+      var opt=document.createElement('option');
+      opt.value=p.id;opt.textContent=p.label;
+      if(p.id===settings.model)opt.selected=true;
+      modelSelect.appendChild(opt);
+    });
+    var customWrap=document.createElement('div');
+    customWrap.style.cssText='margin-top:8px;'+(settings.model==='custom'?'':'display:none;');
+    var customInput=document.createElement('input');
+    customInput.placeholder='provider/model-id';
+    customInput.value=settings.customModel||'';
+    customInput.style.cssText='width:100%;padding:8px;border-radius:6px;border:1px solid #2a2b33;background:#0a0b0f;color:#e9e9ef;font-family:monospace;font-size:11.5px;';
+    customInput.onchange=function(){
+      settings.customModel=customInput.value.trim();
+      saveSettings(settings);
+    };
+    customWrap.appendChild(customInput);
+    modelSelect.onchange=function(){
+      settings.model=modelSelect.value;
+      saveSettings(settings);
+      customWrap.style.display=settings.model==='custom'?'block':'none';
+    };
+    var modelWrap=document.createElement('div');
+    modelWrap.appendChild(modelSelect);
+    modelWrap.appendChild(customWrap);
+    settingsView.appendChild(fieldRow('Model',modelWrap));
+
+    // feature toggles
+    var togglesHeader=document.createElement('div');
+    togglesHeader.textContent='Features';
+    togglesHeader.style.cssText='font-size:11px;color:#8a8b96;margin:16px 0 4px;text-transform:uppercase;letter-spacing:.3px;';
+    settingsView.appendChild(togglesHeader);
+
+    settingsView.appendChild(toggleRow('Markdown rendering','markdown'));
+    settingsView.appendChild(toggleRow('Remember chat on this site','rememberHistory'));
+    settingsView.appendChild(toggleRow('Remember widget position','rememberPosition'));
+    settingsView.appendChild(toggleRow('Show token/cost estimate','showCost'));
+    settingsView.appendChild(toggleRow('Allow "insert into page"','allowInsert'));
+    settingsView.appendChild(toggleRow('Compact size','compact'));
+    settingsView.appendChild(toggleRow('Voice input (mic button)','voiceInput'));
+    settingsView.appendChild(toggleRow('Ctrl+Shift+G to show/hide','keyboardShortcut'));
+
+    // export
+    var exportBtn=document.createElement('button');
+    exportBtn.textContent='Export this chat (.txt)';
+    exportBtn.style.cssText='width:100%;margin-top:16px;padding:9px;border-radius:8px;border:1px solid #2a2b33;background:#191a21;color:#e9e9ef;cursor:pointer;font-size:12px;';
+    exportBtn.onclick=function(){
+      var lines=messages.filter(function(m){return m.role!=='system';}).map(function(m){
+        return (m.role==='user'?'You: ':'ClassGPT: ')+m.content;
+      });
+      var blob=new Blob([lines.join('\n\n')],{type:'text/plain'});
+      var a=document.createElement('a');
+      a.href=URL.createObjectURL(blob);
+      a.download='classgpt-chat.txt';
+      a.click();
+    };
+    settingsView.appendChild(exportBtn);
+
+    var clearHistBtn=document.createElement('button');
+    clearHistBtn.textContent='Clear saved history for this site';
+    clearHistBtn.style.cssText='width:100%;margin-top:8px;padding:9px;border-radius:8px;border:1px solid #2a2b33;background:#191a21;color:#8a8b96;cursor:pointer;font-size:12px;';
+    clearHistBtn.onclick=function(){
+      localStorage.removeItem(historyKey);
+      clearHistBtn.textContent='cleared';
+      setTimeout(function(){clearHistBtn.textContent='Clear saved history for this site';},1200);
+    };
+    settingsView.appendChild(clearHistBtn);
+  }
+
+  document.getElementById('cg-settings-btn').onclick=function(){
+    buildSettingsView();
+    chatView.style.display='none';
+    settingsView.style.display='flex';
+  };
+
+  applySettingsSideEffects();
+  document.getElementById('cg-input').focus();
+})();
+
+});
+</script>
+</body>
+</html>

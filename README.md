@@ -10,6 +10,7 @@ No extension to install. No server. It's a bookmark.
 - It can read the text on the page so you can ask about it (summarize, explain, define a word, etc).
 - If you're already typing in a text box on the page, ClassGPT can drop a reply straight in for you.
 - Everything runs from your own browser using your own OpenRouter API key — nothing goes through a server in between.
+- U can do ur whole homework with it
 
 ## Getting started
 
@@ -44,4 +45,5 @@ If you bake your API key into the bookmarklet, it's stored in plain text inside 
 
 ## Boundaries, on purpose
 
-This is built to help you understand a page — not to auto-fill answers on quizzes or assignments. It only reads a page or inserts text when you click the button for it, and the assistant is prompted to explain things rather than hand you finished answers to hand in as your own.
+This is built to help you do your homework, assignments, or to learn about a page or js to use chatgpt in a locked down page
+

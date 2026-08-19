@@ -1,5 +1,5 @@
 # ClassGPT
-
+https://classgpt.netlify.app/
 A little chat window you can drop into any website with one click, powered by [OpenRouter](https://openrouter.ai).
 
 No extension to install. No server. It's a bookmark.
